@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useStore, formatCurrency, formatDate, generatePaymentId } from '@/app/lib/store';
+import { useStore, formatCurrency, formatDate } from '@/app/lib/store';
 import DataTable from '@/app/components/ui/DataTable';
 import StatCard from '@/app/components/ui/StatCard';
 import Button from '@/app/components/ui/Button';
@@ -9,41 +9,32 @@ import Badge from '@/app/components/ui/Badge';
 import { Card, CardHeader } from '@/app/components/ui/Card';
 import Modal, { ModalFooter } from '@/app/components/ui/Modal';
 import SearchBar from '@/app/components/ui/SearchBar';
-import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import { useToast } from '@/app/components/ui/Toast';
 import {
   CreditCard, DollarSign, Clock, AlertTriangle,
-  Download, Pencil, Trash2, Plus, CheckCircle,
-  Landmark, Smartphone, Wallet, Ban as Bank, ChevronRight as ChevronRightIcon
+  Download, Pencil, CheckCircle, ArrowRightCircle,
+  Landmark, Smartphone, Wallet, Ban as Bank
 } from 'lucide-react';
 
 const PAYMENT_STATUSES = ['Paid', 'Partial', 'Pending', 'Overdue'];
 const PAYMENT_MODES = ['UPI', 'Bank Transfer', 'Cash', 'Cheque'];
-const SERVICE_CATEGORIES = [
-  'Website Development', 'Restaurant Digital Solutions', 'Branding & Identity Design',
-  'Print & Offline Branding', 'Social Media Design', 'Digital Presence Setup', 'Content & Communication'
-];
-const REMINDER_STATUSES = ['None', 'Sent', 'Pending', 'Repeated'];
 
 const MODE_ICONS = { 'UPI': Smartphone, 'Bank Transfer': Landmark, 'Cash': Wallet, 'Cheque': Bank };
 
-const EMPTY_PAYMENT = {
-  id: '', clientId: '', invoiceNo: '', category: '', serviceName: '',
-  projectValue: '', discount: 0, finalAmount: '',
-  advance: 0, remaining: '', due: '', dueDate: '',
-  status: 'Pending', mode: '', paymentDate: '',
-  reminderStatus: 'None', latePayment: false,
-};
-
 export default function PaymentsPage() {
-  const { clients, payments, addPayment, updatePayment, deletePayment } = useStore();
+  const { clients, payments, invoices, updatePayment, updateInvoice } = useStore();
   const toast = useToast();
   const [showModal, setShowModal] = useState(false);
-  const [editId, setEditId] = useState(null);
-  const [form, setForm] = useState(EMPTY_PAYMENT);
+  const [editPayment, setEditPayment] = useState(null);
+  const [editAdvance, setEditAdvance] = useState(0);
+  const [editStatus, setEditStatus] = useState('');
+  const [editMode, setEditMode] = useState('');
+  const [editDate, setEditDate] = useState('');
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [fullPayId, setFullPayId] = useState(null);
+  const [fullPayMode, setFullPayMode] = useState('');
+  const [fullPayDate, setFullPayDate] = useState('');
 
   const filtered = payments.filter(p => {
     const client = clients.find(c => c.id === p.clientId);
@@ -58,40 +49,60 @@ export default function PaymentsPage() {
   const totalDue = payments.reduce((s, p) => s + (Number(p.due) || 0), 0);
   const overdueCount = payments.filter(p => p.status === 'Overdue').length;
 
-  function openAdd() {
-    setForm({ ...EMPTY_PAYMENT });
-    setEditId(null);
-    setShowModal(true);
-  }
-
   function openEdit(p) {
-    setForm({ ...p });
-    setEditId(p.id);
+    setEditPayment(p);
+    setEditAdvance(Number(p.advance || 0));
+    setEditStatus(p.status);
+    setEditMode(p.mode || '');
+    setEditDate(p.paymentDate || '');
     setShowModal(true);
   }
 
   async function handleSave() {
-    if (!form.clientId) { toast.warning('Client is required'); return; }
-    const data = { ...form };
-    data.finalAmount = Number(data.projectValue || 0) - Number(data.discount || 0);
-    data.remaining = data.finalAmount - Number(data.advance || 0);
-    data.due = data.status === 'Paid' ? 0 : data.remaining;
+    if (!editPayment) return;
+    const remaining = Number(editPayment.finalAmount || 0) - Number(editAdvance || 0);
+    const due = editStatus === 'Paid' ? 0 : remaining;
 
-    if (editId) {
-      await updatePayment(editId, data);
-      toast.success('Payment updated');
-    } else {
-      data.id = generatePaymentId(payments);
-      await addPayment(data);
-      toast.success('Payment recorded');
-    }
+    await updatePayment(editPayment.id, {
+      advance: Number(editAdvance || 0),
+      remaining, due,
+      status: editStatus,
+      mode: editMode,
+      paymentDate: editDate,
+    });
+
+    await updateInvoice(editPayment.invoiceNo, {
+      status: editStatus,
+      mode: editMode,
+    });
+
+    toast.success('Payment updated');
     setShowModal(false);
+    setEditPayment(null);
   }
 
-  async function handleDelete(id) {
-    await deletePayment(id);
-    toast.success('Payment deleted');
-    setDeleteTarget(null);
+  async function handleFullPayment() {
+    if (!fullPayId) return;
+    const p = payments.find(x => x.id === fullPayId);
+    if (!p) return;
+    const advance = Number(p.finalAmount || 0);
+
+    await updatePayment(p.id, {
+      advance, remaining: 0, due: 0,
+      status: 'Paid',
+      mode: fullPayMode,
+      paymentDate: fullPayDate || new Date().toISOString().split('T')[0],
+    });
+
+    await updateInvoice(p.invoiceNo, {
+      status: 'Paid',
+      mode: fullPayMode,
+    });
+
+    toast.success('Full payment received');
+    setFullPayId(null);
+    setFullPayMode('');
+    setFullPayDate('');
   }
 
   function exportExcel() {
@@ -109,17 +120,6 @@ export default function PaymentsPage() {
     URL.revokeObjectURL(url);
     toast.success('Payments exported');
   }
-
-  const f = (key) => (e) => setForm(prev => {
-    const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
-    const next = { ...prev, [key]: val };
-    const pv = Number(next.projectValue || 0);
-    const disc = Number(next.discount || 0);
-    next.finalAmount = pv - disc;
-    next.remaining = next.finalAmount - Number(next.advance || 0);
-    next.due = next.status === 'Paid' ? 0 : next.remaining;
-    return next;
-  });
 
   const getClientName = (id) => clients.find(c => c.id === id)?.name || id;
 
@@ -165,7 +165,6 @@ export default function PaymentsPage() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <Button variant="secondary" size="sm" icon={Download} onClick={exportExcel}>Export</Button>
-          <Button icon={Plus} onClick={openAdd}>Add Payment</Button>
         </div>
       </div>
 
@@ -199,115 +198,101 @@ export default function PaymentsPage() {
             actions={(row) => (
               <div style={{ display: 'flex', gap: 4 }}>
                 <button className="btn-icon" onClick={() => openEdit(row)} title="Edit"><Pencil size={14} /></button>
-                <button className="btn-icon" style={{ color: '#EF4444' }} onClick={() => setDeleteTarget(row.id)} title="Delete"><Trash2 size={14} /></button>
+                {row.status === 'Partial' && (
+                  <button className="btn-icon" style={{ color: '#22C55E' }} onClick={() => {
+                    setFullPayId(row.id);
+                    setFullPayMode(row.mode || '');
+                    setFullPayDate(row.paymentDate || new Date().toISOString().split('T')[0]);
+                  }} title="Full Payment Received"><ArrowRightCircle size={14} /></button>
+                )}
               </div>
             )}
           />
         </Card>
       </div>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)}
-        title={editId ? 'Edit Payment' : 'Add Payment Record'} size="lg">
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Client *</label>
-            <select className="form-select" value={form.clientId} onChange={(e) => setForm(prev => ({ ...prev, clientId: e.target.value }))}>
-              <option value="">Select client</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.id} — {c.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Invoice</label>
-            <input className="form-input" value={form.invoiceNo} onChange={f('invoiceNo')} placeholder="MC/0001/2026-27" />
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Category</label>
-            <select className="form-select" value={form.category} onChange={f('category')}>
-              <option value="">Select</option>
-              {SERVICE_CATEGORIES.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Service</label>
-            <input className="form-input" value={form.serviceName} onChange={f('serviceName')} placeholder="Services provided" />
-          </div>
-        </div>
-        <div className="divider" />
-        <div className="form-row-3">
-          <div className="form-group">
-            <label className="form-label">Project Value (₹)</label>
-            <input className="form-input" type="number" value={form.projectValue} onChange={f('projectValue')} placeholder="0" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Discount (₹)</label>
-            <input className="form-input" type="number" value={form.discount} onChange={f('discount')} placeholder="0" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Final Amount</label>
-            <input className="form-input" value={formatCurrency(form.finalAmount)} readOnly style={{ color: '#22C55E', fontWeight: 600 }} />
-          </div>
-        </div>
-        <div className="form-row-3">
-          <div className="form-group">
-            <label className="form-label">Advance (₹)</label>
-            <input className="form-input" type="number" value={form.advance} onChange={f('advance')} placeholder="0" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Remaining</label>
-            <input className="form-input" value={formatCurrency(form.remaining)} readOnly />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Due Amount</label>
-            <input className="form-input" value={formatCurrency(form.due)} readOnly style={{ color: form.due > 0 ? '#EF4444' : '#9CA3AF', fontWeight: 600 }} />
-          </div>
-        </div>
-        <div className="divider" />
-        <div className="form-row-3">
-          <div className="form-group">
-            <label className="form-label">Status</label>
-            <select className="form-select" value={form.status} onChange={f('status')}>
-              {PAYMENT_STATUSES.map(s => <option key={s}>{s}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Mode</label>
-            <select className="form-select" value={form.mode} onChange={f('mode')}>
-              <option value="">Select</option>
-              {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Payment Date</label>
-            <input className="form-input" type="date" value={form.paymentDate} onChange={f('paymentDate')} />
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Due Date</label>
-            <input className="form-input" type="date" value={form.dueDate} onChange={f('dueDate')} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Reminder Status</label>
-            <select className="form-select" value={form.reminderStatus} onChange={f('reminderStatus')}>
-              {REMINDER_STATUSES.map(r => <option key={r}>{r}</option>)}
-            </select>
-          </div>
-        </div>
-        <ModalFooter>
-          <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
-          <Button onClick={handleSave}>{editId ? 'Update' : 'Save Payment'}</Button>
-        </ModalFooter>
+      {/* Edit Payment Modal */}
+      <Modal open={showModal} onClose={() => { setShowModal(false); setEditPayment(null); }}
+        title="Edit Payment" size="md">
+        {editPayment && (
+          <>
+            <div style={{ marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{getClientName(editPayment.clientId)}</div>
+              <div style={{ fontSize: 12, color: '#22C55E', marginTop: 2 }}>{editPayment.invoiceNo}</div>
+              <div style={{ fontSize: 12, color: '#9CA3AF', marginTop: 2 }}>Total: {formatCurrency(editPayment.finalAmount)} · Due: {formatCurrency(editPayment.due)}</div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Status</label>
+              <select className="form-select" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                {PAYMENT_STATUSES.map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Advance Received (₹)</label>
+              <input className="form-input" type="number" value={editAdvance} onChange={e => setEditAdvance(e.target.value)} placeholder="0" />
+            </div>
+            {(editStatus === 'Partial' || editStatus === 'Paid') && (
+              <div style={{ fontSize: 12, color: '#F59E0B', marginBottom: 12 }}>
+                Remaining: {formatCurrency(Number(editPayment.finalAmount || 0) - Number(editAdvance || 0))}
+              </div>
+            )}
+            <div className="form-row">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Mode</label>
+                <select className="form-select" value={editMode} onChange={e => setEditMode(e.target.value)}>
+                  <option value="">Select</option>
+                  {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Payment Date</label>
+                <input className="form-input" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
+              </div>
+            </div>
+            <ModalFooter>
+              <Button variant="secondary" onClick={() => { setShowModal(false); setEditPayment(null); }}>Cancel</Button>
+              <Button onClick={handleSave}>Update Payment</Button>
+            </ModalFooter>
+          </>
+        )}
       </Modal>
 
-      <ConfirmDialog
-        open={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={() => handleDelete(deleteTarget)}
-        title="Delete Payment"
-        message="This will permanently remove this payment record."
-      />
+      {/* Full Payment Received Modal */}
+      <Modal open={!!fullPayId} onClose={() => { setFullPayId(null); setFullPayMode(''); setFullPayDate(''); }}
+        title="Full Payment Received" size="sm">
+        {fullPayId && (() => {
+          const p = payments.find(x => x.id === fullPayId);
+          if (!p) return null;
+          const remainingAmt = Number(p.finalAmount || 0) - Number(p.advance || 0);
+          return (
+            <>
+              <div style={{ marginBottom: 16, padding: 12, background: 'rgba(34,197,94,0.06)', borderRadius: 8, border: '1px solid rgba(34,197,94,0.15)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{getClientName(p.clientId)}</div>
+                <div style={{ fontSize: 12, color: '#22C55E', marginTop: 2 }}>{p.invoiceNo}</div>
+                <div style={{ fontSize: 24, fontWeight: 800, color: '#22C55E', marginTop: 8 }}>{formatCurrency(remainingAmt)}</div>
+                <div style={{ fontSize: 11, color: '#9CA3AF' }}>Remaining amount to collect</div>
+              </div>
+              <div className="form-row">
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Mode</label>
+                  <select className="form-select" value={fullPayMode} onChange={e => setFullPayMode(e.target.value)}>
+                    <option value="">Select</option>
+                    {PAYMENT_MODES.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Payment Date</label>
+                  <input className="form-input" type="date" value={fullPayDate} onChange={e => setFullPayDate(e.target.value)} />
+                </div>
+              </div>
+              <ModalFooter>
+                <Button variant="secondary" onClick={() => { setFullPayId(null); setFullPayMode(''); setFullPayDate(''); }}>Cancel</Button>
+                <Button onClick={handleFullPayment}>Confirm Full Payment</Button>
+              </ModalFooter>
+            </>
+          );
+        })()}
+      </Modal>
     </div>
   );
 }

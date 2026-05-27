@@ -5,13 +5,14 @@ import { useStore, formatCurrency, formatDate } from '@/app/lib/store';
 import DataTable from '@/app/components/ui/DataTable';
 import StatCard from '@/app/components/ui/StatCard';
 import Button from '@/app/components/ui/Button';
+import Badge from '@/app/components/ui/Badge';
 import { Card, CardHeader } from '@/app/components/ui/Card';
 import SearchBar from '@/app/components/ui/SearchBar';
 import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import { useToast } from '@/app/components/ui/Toast';
 import {
-  History, Download, Trash2, CheckCircle, Clock, Printer, Send,
-  DollarSign, FileText, ChevronRight as ChevronRightIcon
+  History, Download, Trash2, CheckCircle, Clock, Printer, Mail,
+  DollarSign, FileText, MessageCircle
 } from 'lucide-react';
 
 const LOGO_URL = 'https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_auto/v1779002789/Manhar_Creatives_Logo_lgwias.png';
@@ -24,7 +25,7 @@ const TERMS = [
 ];
 
 export default function InvoiceHistoryPage() {
-  const { clients, invoices, deleteInvoice, updateInvoice } = useStore();
+  const { clients, invoices, deleteInvoice } = useStore();
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -57,14 +58,9 @@ export default function InvoiceHistoryPage() {
     setDeleteTarget(null);
   }
 
-  async function handleStatusChange(id, status) {
-    await updateInvoice(id, { status });
-    toast.info(`Status updated to ${status}`);
-  }
-
   function handlePrint(inv) {
     // Open at exact A4 pixel size (210mm × 297mm at 96dpi = 794×1123px)
-    const w = window.open('', '_blank', 'width=794,height=1123,menubar=no,toolbar=no,location=no,scrollbars=yes');
+    const w = window.open('', '_blank', 'width=900,height=700,menubar=no,toolbar=no,location=no,scrollbars=yes');
     if (!w) return;
 
     const client = clients.find(c => c.id === inv.clientId);
@@ -105,41 +101,36 @@ export default function InvoiceHistoryPage() {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=794">
+  <meta name="viewport" content="width=210mm">
   <title>${inv.id} — Manhar Creatives</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
 
-      html {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        height: auto !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        color-adjust: exact !important;
-      }
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        background: #fff !important;
-        font-family: 'Inter', sans-serif;
-        color: #111;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        color-adjust: exact !important;
-      }
+    html {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      font-family: 'Inter', sans-serif;
+      color: #111;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
     .page {
       width: 100% !important;
       max-width: 100% !important;
       margin: 0 !important;
       padding: 0 !important;
-      display: flex;
-      flex-direction: column;
       background: #fff;
-      min-height: 100vh;
     }
 
     .hdr {
@@ -150,7 +141,6 @@ export default function InvoiceHistoryPage() {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      flex-shrink: 0;
     }
 
     .ftr {
@@ -159,7 +149,7 @@ export default function InvoiceHistoryPage() {
       print-color-adjust: exact !important;
       padding: 14px 15px;
       text-align: center;
-      flex-shrink: 0;
+      page-break-inside: avoid;
     }
 
     .total-box {
@@ -204,7 +194,7 @@ export default function InvoiceHistoryPage() {
 
     @page {
       size: A4 portrait;
-      margin: 20mm;
+      margin: 15mm;
     }
   </style>
 </head>
@@ -235,7 +225,7 @@ export default function InvoiceHistoryPage() {
     </div>
   </div>
 
-  <div style="padding:12px 15px;border-bottom:1px solid #eee;display:grid;grid-template-columns:1fr 1fr;gap:18px;flex-shrink:0">
+  <div style="padding:12px 15px;border-bottom:1px solid #eee;display:grid;grid-template-columns:1fr 1fr;gap:18px">
     <div>
       <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#888;margin-bottom:4px">Bill To</div>
       <div style="font-size:15px;font-weight:800;color:#0B0F0E;margin-bottom:2px">${inv.clientName || '—'}</div>
@@ -253,7 +243,7 @@ export default function InvoiceHistoryPage() {
     </div>
   </div>
 
-  <div style="padding:0 15px;flex-shrink:0">
+  <div style="padding:0 15px">
     <table>
       <thead>
         <tr>
@@ -268,7 +258,7 @@ export default function InvoiceHistoryPage() {
     </table>
   </div>
 
-  <div style="padding:8px 15px 12px;display:flex;justify-content:flex-end;flex-shrink:0">
+  <div style="padding:8px 15px 12px;display:flex;justify-content:flex-end">
     <div style="min-width:220px">
       <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:11px;color:#555">
         <span>Subtotal</span>
@@ -282,24 +272,22 @@ export default function InvoiceHistoryPage() {
     </div>
   </div>
 
-  <div style="margin-top:auto;flex-shrink:0">
-    <div style="padding:0 15px 10px;display:grid;grid-template-columns:1fr 1.3fr;gap:12px;flex-shrink:0">
-      <div class="notes-box">
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px">Notes</div>
-        <div style="font-size:10px;color:#444;line-height:1.6">Thank you for choosing Manhar Creatives! We appreciate your trust and look forward to working with you.</div>
-      </div>
-      <div>
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px">Terms &amp; Conditions</div>
-        <div style="font-size:9px;color:#666;line-height:1.7">${termsHtml}</div>
-      </div>
+  <div style="padding:0 15px 10px;display:grid;grid-template-columns:1fr 1.3fr;gap:12px">
+    <div class="notes-box">
+      <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px">Notes</div>
+      <div style="font-size:10px;color:#444;line-height:1.6">Thank you for choosing Manhar Creatives! We appreciate your trust and look forward to working with you.</div>
     </div>
+    <div>
+      <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px">Terms &amp; Conditions</div>
+      <div style="font-size:9px;color:#666;line-height:1.7">${termsHtml}</div>
+    </div>
+  </div>
 
-    <div style="padding:8px 15px 12px;display:flex;justify-content:center;border-top:1px solid #eee;flex-shrink:0">
-      <div style="text-align:center">
-        <div style="width:110px;border-bottom:1.5px solid #22C55E;margin-bottom:4px;height:26px"></div>
-        <div style="font-size:9px;color:#888">Authorized Signature</div>
-        <div style="font-size:10px;font-weight:700;color:#333;margin-top:2px">Manhar Creatives</div>
-      </div>
+  <div style="padding:8px 15px 12px;display:flex;justify-content:center;border-top:1px solid #eee">
+    <div style="text-align:center">
+      <div style="width:110px;border-bottom:1.5px solid #22C55E;margin-bottom:4px;height:26px"></div>
+      <div style="font-size:9px;color:#888">Authorized Signature</div>
+      <div style="font-size:10px;font-weight:700;color:#333;margin-top:2px">Manhar Creatives</div>
     </div>
   </div>
 
@@ -310,7 +298,6 @@ export default function InvoiceHistoryPage() {
 
 </div>
 <script>
-  try { window.resizeTo(794, 1123); } catch(e){}
   var imgs = document.querySelectorAll('img');
   var total = imgs.length, loaded = 0;
   function doPrint() { setTimeout(function(){ window.focus(); window.print(); }, 500); }
@@ -321,7 +308,6 @@ export default function InvoiceHistoryPage() {
       else { img.onload = img.onerror = function() { if (++loaded >= total) doPrint(); }; }
     });
   }
-
 </script>
 </body>
 </html>`);
@@ -342,34 +328,27 @@ export default function InvoiceHistoryPage() {
     { key: 'amount', label: 'Amount', width: 100, render: (v) => formatCurrency(v) },
     { key: 'discount', label: 'Discount', width: 90, render: (v) => v ? <span style={{ color: '#F59E0B' }}>{formatCurrency(v)}</span> : '—' },
     { key: 'final', label: 'Final', width: 100, render: (v) => <span style={{ fontWeight: 700, color: '#22C55E', fontSize: 14 }}>{formatCurrency(v)}</span> },
-    { key: 'status', label: 'Status', width: 110, render: (v, r) => (
-      <select
-        value={v}
-        onChange={e => handleStatusChange(r.id, e.target.value)}
-        style={{
-          background: 'transparent', border: 'none', cursor: 'pointer',
-          fontSize: 12, fontWeight: 600, outline: 'none',
-          color: v === 'Paid' ? '#22C55E' : v === 'Partial' ? '#3B82F6' : v === 'Overdue' ? '#EF4444' : '#F59E0B',
-        }}
-      >
-        <option>Paid</option><option>Partial</option><option>Pending</option><option>Overdue</option>
-      </select>
-    )},
+    { key: 'status', label: 'Status', width: 100, render: (v) => <Badge status={v.toLowerCase()} /> },
     { key: 'mode', label: 'Mode', width: 80, render: (v) => <span style={{ fontSize: 12 }}>{v || '—'}</span> },
-    { key: 'actions', label: 'Actions', width: 150, render: (_, row) => (
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button className="btn-icon" onClick={() => handlePrint(row)} title="View/Print"><Printer size={14} /></button>
-        <button className="btn-icon" style={{ color: '#3B82F6' }} onClick={() => {
-          const client = clients.find(c => c.id === row.clientId);
-          if (!client) { toast.warning('Client not found'); return; }
-          const subject = encodeURIComponent(`Reminder: Payment Due for Invoice ${row.id}`);
-          const body = encodeURIComponent(`Dear ${row.clientName},\n\nThis is a reminder that Invoice ${row.id} for ₹${Number(row.final).toLocaleString('en-IN')} is due. Kindly make the payment at your earliest convenience.\n\nThank you,\nManhar Creatives`);
-          window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(client.email || '')}&su=${subject}&body=${body}`, '_blank');
-          window.open(`https://wa.me/91${(client.phone || '').replace(/\s/g, '')}?text=${encodeURIComponent(`Dear ${row.clientName}, Invoice ${row.id} for ₹${Number(row.final).toLocaleString('en-IN')} is due. Kindly make the payment. - Manhar Creatives`)}`, '_blank');
-        }} title="Send Reminder (Email & WhatsApp)"><Send size={14} /></button>
-        <button className="btn-icon" style={{ color: '#EF4444' }} onClick={() => setDeleteTarget(row.id)} title="Delete"><Trash2 size={14} /></button>
-      </div>
-    )},
+    { key: 'actions', label: 'Actions', width: 160, render: (_, row) => {
+      const client = clients.find(c => c.id === row.clientId);
+      return (
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button className="btn-icon" onClick={() => handlePrint(row)} title="Print"><Printer size={14} /></button>
+          <button className="btn-icon" style={{ color: '#3B82F6' }} onClick={() => {
+            if (!client) { toast.warning('Client not found'); return; }
+            const subject = encodeURIComponent(`Invoice ${row.id} — Manhar Creatives`);
+            const body = encodeURIComponent(`Dear ${row.clientName},\n\nPlease find the invoice ${row.id} for ₹${Number(row.final).toLocaleString('en-IN')} attached.\n\nThank you,\nManhar Creatives`);
+            window.open(`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(client.email || '')}&su=${subject}&body=${body}`, '_blank');
+          }} title="Email"><Mail size={14} /></button>
+          <button className="btn-icon" style={{ color: '#25D366' }} onClick={() => {
+            if (!client) { toast.warning('Client not found'); return; }
+            window.open(`https://wa.me/91${(client.phone || '').replace(/\s/g, '')}?text=${encodeURIComponent(`Dear ${row.clientName}, Invoice ${row.id} for ₹${Number(row.final).toLocaleString('en-IN')}. Kindly check and pay. - Manhar Creatives`)}`, '_blank');
+          }} title="WhatsApp"><MessageCircle size={14} /></button>
+          <button className="btn-icon" style={{ color: '#EF4444' }} onClick={() => setDeleteTarget(row.id)} title="Delete"><Trash2 size={14} /></button>
+        </div>
+      );
+    }},
   ];
 
   return (

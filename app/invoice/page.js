@@ -13,7 +13,7 @@ const TERMS = `1. Revisions beyond the agreed scope may incur additional charges
 3. For any queries, contact us at manharcreatives@gmail.com`;
 
 export default function InvoicePage() {
-  const { clients, invoices, addInvoice, updateInvoice, payments, addPayment } = useStore();
+  const { clients, invoices, addInvoice, payments, addPayment } = useStore();
   const toast = useToast();
 
   const [clientId, setClientId] = useState('');
@@ -28,12 +28,9 @@ export default function InvoicePage() {
   const [advancePaid, setAdvancePaid] = useState(0);
   const [saved, setSaved] = useState(false);
   const [savedInvoiceNo, setSavedInvoiceNo] = useState('');
-  const [invoiceMode, setInvoiceMode] = useState('new');
-  const [partialSourceId, setPartialSourceId] = useState('');
   const printRef = useRef(null);
 
   const client = clients.find(c => c.id === clientId);
-  const partialSource = invoiceMode === 'partial' && partialSourceId ? invoices.find(i => i.id === partialSourceId) : null;
 
   const subtotal = lines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0);
   const discountAmount = discountType === 'percent' ? Math.round(subtotal * Number(discountVal) / 100) : Number(discountVal) || 0;
@@ -57,42 +54,6 @@ export default function InvoicePage() {
   async function handleGenerate() {
     if (!clientId) { toast.warning('Please select a client'); return; }
     if (lines.every(l => !l.description)) { toast.warning('Add at least one service'); return; }
-
-    if (invoiceMode === 'partial') {
-      if (!partialSourceId) { toast.warning('Select a source invoice for partial payment'); return; }
-      const sourceInv = invoices.find(i => i.id === partialSourceId);
-      if (!sourceInv) { toast.warning('Source invoice not found'); return; }
-      const partialAmount = Number(advancePaid) || 0;
-      if (partialAmount <= 0) { toast.warning('Enter partial payment amount'); return; }
-
-      const invoiceNo = generateInvoiceNumber(invoices);
-      const newInvoice = {
-        id: invoiceNo, date: invoiceDate, clientId,
-        clientName: client?.name || '', business: client?.business || '',
-        services: `Partial Payment against ${sourceInv.id}`, amount: partialAmount, discount: 0,
-        final: partialAmount, status: 'Partial', mode: paymentMode, pdfLink: '',
-        lineItems: [{ description: `Partial Payment against ${sourceInv.id} (${sourceInv.clientName})`, qty: 1, rate: partialAmount, amount: partialAmount }],
-        partialSource: sourceInv.id,
-      };
-      await addInvoice(newInvoice);
-      setSavedInvoiceNo(invoiceNo);
-      setSaved(true);
-
-      const newPayment = {
-        id: `PAY-${String(payments.length + 1).padStart(4, '0')}`,
-        clientId, invoiceNo, category: '', serviceName: `Partial Payment against ${sourceInv.id}`,
-        projectValue: partialAmount, discount: 0, finalAmount: partialAmount,
-        advance: partialAmount, remaining: 0, due: 0,
-        dueDate: '', status: 'Paid', mode: paymentMode,
-        paymentDate: invoiceDate,
-        reminderStatus: 'None', latePayment: false,
-      };
-      await addPayment(newPayment);
-
-      await updateInvoice(sourceInv.id, { status: 'Partial' });
-      toast.success(`Partial payment invoice ${invoiceNo} generated successfully`);
-      return;
-    }
 
     const invoiceNo = generateInvoiceNumber(invoices);
     const servicesStr = lines.filter(l => l.description).map(l => l.description).join(', ');
@@ -129,38 +90,39 @@ export default function InvoicePage() {
     const el = document.getElementById('invoice-print');
     if (!el) return;
     // Open at exact A4 pixel size (210mm × 297mm at 96dpi = 794×1123px)
-    const w = window.open('', '_blank', 'width=794,height=1123,menubar=no,toolbar=no,location=no,scrollbars=yes');
+    const w = window.open('', '_blank', 'width=900,height=700,menubar=no,toolbar=no,location=no,scrollbars=yes');
     if (!w) return;
     w.document.write(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=794">
+  <meta name="viewport" content="width=210mm">
   <title>${invoiceNo} — Manhar Creatives</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
-    <style>
-      html {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        height: auto !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        color-adjust: exact !important;
-      }
-      body {
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        background: #fff !important;
-        font-family: 'Inter', sans-serif;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        color-adjust: exact !important;
-      }
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #fff !important;
+      font-family: 'Inter', sans-serif;
+      color: #111;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
+    }
     #invoice-print {
       display: block !important;
       width: 100% !important;
+      max-width: 100% !important;
       margin: 0 !important;
       padding: 0 !important;
       border-radius: 0 !important;
@@ -169,15 +131,13 @@ export default function InvoicePage() {
     }
     @page {
       size: A4 portrait;
-      margin: 20mm;
+      margin: 15mm;
     }
   </style>
 </head>
 <body>
 ${el.outerHTML}
 <script>
-  // Resize window to exact A4 width to prevent any scaling
-  try { window.resizeTo(794, 1123); } catch(e){}
   var imgs = document.querySelectorAll('img');
   var total = imgs.length, loaded = 0;
   function doPrint() { setTimeout(function(){ window.focus(); window.print(); }, 500); }
@@ -201,7 +161,6 @@ ${el.outerHTML}
     setSaved(false); setSavedInvoiceNo('');
     setInvoiceDate(new Date().toISOString().split('T')[0]);
     setDueDate('');
-    setInvoiceMode('new'); setPartialSourceId('');
   }
 
   const invoiceNo = saved ? savedInvoiceNo : generateInvoiceNumber(invoices);
@@ -257,7 +216,7 @@ ${el.outerHTML}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 28, fontWeight: 900, color: '#22C55E', fontFamily: 'Outfit, sans-serif', letterSpacing: -1 }}>{invoiceMode === 'partial' ? 'PAYMENT RECEIPT' : 'INVOICE'}</div>
+                    <div style={{ fontSize: 28, fontWeight: 900, color: '#22C55E', fontFamily: 'Outfit, sans-serif', letterSpacing: -1 }}>INVOICE</div>
                     <div style={{ fontSize: 13, color: '#fff', fontWeight: 600, marginTop: 4 }}>{invoiceNo}</div>
                     <div style={{ marginTop: 16, fontSize: 12, color: '#9CA3AF' }}>
                       <div>Date: <span style={{ color: '#fff' }}>{formatDate(invoiceDate)}</span></div>
@@ -397,48 +356,6 @@ ${el.outerHTML}
 
           {/* Control Panel */}
           <div className="no-print" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Card>
-              <CardHeader title="Invoice Mode" />
-              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                <Button size="sm" variant={invoiceMode === 'new' ? 'primary' : 'secondary'} onClick={() => setInvoiceMode('new')}>New Invoice</Button>
-                <Button size="sm" variant={invoiceMode === 'partial' ? 'primary' : 'secondary'} onClick={() => setInvoiceMode('partial')}>Partial Payment</Button>
-              </div>
-              {invoiceMode === 'partial' && (<>
-                <div className="form-group">
-                  <label className="form-label">Source Invoice (Pending)</label>
-                  <select className="form-select" value={partialSourceId} onChange={e => {
-                    const invId = e.target.value;
-                    setPartialSourceId(invId);
-                    const inv = invoices.find(i => i.id === invId);
-                    if (inv) {
-                      setClientId(inv.clientId);
-                      setAdvancePaid(Number(inv.final || 0));
-                      setPaymentStatus('Partial');
-                      setInvoiceDate(new Date().toISOString().split('T')[0]);
-                    } else {
-                      setAdvancePaid(0);
-                    }
-                  }}>
-                    <option value="">Select invoice</option>
-                    {invoices.filter(i => i.status === 'Pending' || i.status === 'Partial').map(inv => (
-                      <option key={inv.id} value={inv.id}>{inv.id} — {inv.clientName} (₹{Number(inv.final).toLocaleString('en-IN')})</option>
-                    ))}
-                  </select>
-                </div>
-                {partialSource && (
-                  <div style={{ marginTop: 12, padding: 12, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: '#F59E0B', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>Source Invoice Details</div>
-                    <div style={{ fontSize: 12, color: '#9CA3AF', lineHeight: 1.8 }}>
-                      <div><span style={{ color: '#22C55E' }}>{partialSource.id}</span> — {partialSource.clientName}</div>
-                      <div>Services: {partialSource.services || '—'}</div>
-                      <div>Original Amount: <strong style={{ color: '#fff' }}>₹{Number(partialSource.amount).toLocaleString('en-IN')}</strong></div>
-                      {partialSource.discount > 0 && <div>Discount: <strong style={{ color: '#F59E0B' }}>— ₹{Number(partialSource.discount).toLocaleString('en-IN')}</strong></div>}
-                      <div>Final Amount: <strong style={{ color: '#22C55E' }}>₹{Number(partialSource.final).toLocaleString('en-IN')}</strong></div>
-                    </div>
-                  </div>
-                )}
-              </>)}
-            </Card>
             <Card>
               <CardHeader title="Client Details" />
               <div className="form-group">
