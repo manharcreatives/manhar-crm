@@ -178,10 +178,9 @@ export default function DashboardPage() {
         <div className="stats-grid">
           <StatCard icon={DollarSign} color="green" value={stats.totalRevenue} label="Total Revenue" trend={12} />
           <StatCard icon={FileText} color="blue" value={stats.totalInvoices} label="Total Invoices" />
-          <StatCard icon={CheckCircle} color="green" value={formatCurrency(stats.paidPayments)} label="Paid Payments" suffix="" />
-          <StatCard icon={Clock} color="yellow" value={formatCurrency(stats.pendingPayments)} label="Pending Payments" suffix="" />
-          <StatCard icon={Users} color="teal" value={stats.activeClients} label="Active Clients" />
-          <StatCard icon={TrendingUp} color="purple" value={formatCurrency(stats.avgInvoice)} label="Avg Invoice Value" prefix="" />
+          <StatCard icon={CheckCircle} color="green" value={stats.paidPayments} label="Paid Payments" prefix="₹" />
+          <StatCard icon={Clock} color="yellow" value={stats.pendingPayments} label="Pending Payments" prefix="₹" />
+          <StatCard icon={TrendingUp} color="purple" value={stats.avgInvoice} label="Avg Invoice Value" prefix="₹" />
         </div>
 
         {/* Charts */}

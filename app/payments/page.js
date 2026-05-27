@@ -171,9 +171,9 @@ export default function PaymentsPage() {
       <div className="page-content" style={{ paddingTop: 0 }}>
         {/* Summary */}
         <div className="stats-grid">
-          <StatCard icon={DollarSign} color="blue" value={formatCurrency(totalBilled)} label="Total Billed" />
-          <StatCard icon={CheckCircle} color="green" value={formatCurrency(totalReceived)} label="Total Received" />
-          <StatCard icon={Clock} color="yellow" value={formatCurrency(totalDue)} label="Pending Due" />
+          <StatCard icon={DollarSign} color="blue" value={totalBilled} label="Total Billed" prefix="₹" />
+          <StatCard icon={CheckCircle} color="green" value={totalReceived} label="Total Received" prefix="₹" />
+          <StatCard icon={Clock} color="yellow" value={totalDue} label="Pending Due" prefix="₹" />
           <StatCard icon={AlertTriangle} color="red" value={overdueCount} label="Overdue" />
         </div>
 
