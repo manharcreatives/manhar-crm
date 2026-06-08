@@ -5,8 +5,9 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard, Users, Target, CreditCard, FileText,
-  History, Zap, ChevronLeft, Menu, X
+  History, Zap, ChevronLeft, Menu, X, LogOut
 } from 'lucide-react';
+import { useAuth } from '../../lib/auth';
 
 const NAV_ITEMS = [
   {
@@ -42,6 +43,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { logout } = useAuth();
 
   useEffect(() => {
     const handleKey = (e) => {
@@ -116,6 +118,10 @@ export default function Sidebar() {
         </nav>
 
         <div className="sidebar-footer">
+          <button className="sidebar-logout" onClick={logout} title="Logout">
+            <LogOut size={16} />
+            <span>Logout</span>
+          </button>
           <p>© 2026 Manhar Creatives</p>
         </div>
       </aside>

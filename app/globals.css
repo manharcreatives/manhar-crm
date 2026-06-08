@@ -201,6 +201,25 @@ body {
 .sidebar-footer p { font-size: 11px; color: var(--text-muted); text-align: center; white-space: nowrap; }
 .sidebar.collapsed .sidebar-footer p { display: none; }
 
+.sidebar-logout {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 8px 12px; margin-bottom: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: var(--radius-md);
+  color: #EF4444; cursor: pointer;
+  font-size: 12.5px; font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  transition: all var(--transition-fast);
+  white-space: nowrap; overflow: hidden;
+}
+.sidebar-logout:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+.sidebar.collapsed .sidebar-logout { justify-content: center; padding: 8px 0; }
+.sidebar.collapsed .sidebar-logout span { display: none; }
+
 /* =============================================
    MAIN CONTENT
    ============================================= */

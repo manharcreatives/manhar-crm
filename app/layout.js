@@ -1,5 +1,6 @@
 import { StoreProvider } from './lib/store';
 import { ToastProvider } from './components/ui/Toast';
+import { AuthProvider } from './lib/auth';
 import Sidebar from './components/layout/Sidebar';
 import './globals.css';
 
@@ -7,6 +8,7 @@ export const metadata = {
   title: 'Manhar Creatives — Agency CRM & Billing System',
   description: 'Complete business operations system for Manhar Creatives — CRM, Billing, Invoicing, and Analytics.',
   keywords: 'Manhar Creatives, Agency CRM, Billing, Invoice, Digital Agency Gujarat',
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }) {
@@ -17,17 +19,25 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body>
-        <StoreProvider>
-          <ToastProvider>
-            <div className="app-layout">
-              <Sidebar />
-              <main className="main-content">
-                {children}
-              </main>
-            </div>
-          </ToastProvider>
-        </StoreProvider>
+        <AuthProvider>
+          <StoreProvider>
+            <ToastProvider>
+              <AppShell>{children}</AppShell>
+            </ToastProvider>
+          </StoreProvider>
+        </AuthProvider>
       </body>
     </html>
+  );
+}
+
+function AppShell({ children }) {
+  return (
+    <div className="app-layout">
+      <Sidebar />
+      <main className="main-content">
+        {children}
+      </main>
+    </div>
   );
 }
