@@ -80,6 +80,9 @@ export default function LoginPage() {
       </div>
 
       <style jsx>{`
+        :global(.main-content) {
+          margin-left: 0 !important;
+        }
         .login-page {
           min-height: 100vh;
           display: flex;

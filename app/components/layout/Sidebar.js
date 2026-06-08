@@ -45,6 +45,8 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { logout } = useAuth();
 
+  if (pathname === '/login') return null;
+
   useEffect(() => {
     const handleKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
