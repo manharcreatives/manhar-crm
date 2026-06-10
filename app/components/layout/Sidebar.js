@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
   LayoutDashboard, Users, Target, CreditCard, FileText,
-  History, Zap, ChevronLeft, Menu, X, LogOut
+  History, Zap, Receipt, ChevronLeft, Menu, X, LogOut
 } from 'lucide-react';
 import { useAuth } from '../../lib/auth';
 
@@ -27,6 +27,7 @@ const NAV_ITEMS = [
     section: 'Finance',
     items: [
       { href: '/payments', label: 'Payment Tracker', icon: CreditCard },
+      { href: '/expenses', label: 'Expenses', icon: Receipt },
       { href: '/invoice', label: 'Invoice Generator', icon: FileText },
       { href: '/history', label: 'Invoice History', icon: History },
     ]
@@ -45,8 +46,6 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { logout } = useAuth();
 
-  if (pathname === '/login') return null;
-
   useEffect(() => {
     const handleKey = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
@@ -64,6 +63,8 @@ export default function Sidebar() {
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  if (pathname === '/login') return null;
 
   const sidebarClass = `sidebar ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'open' : ''}`;
 

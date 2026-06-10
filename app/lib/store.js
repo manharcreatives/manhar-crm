@@ -66,6 +66,23 @@ export function generateServiceId(services) {
   return `SRV-${String(max + 1).padStart(3, '0')}`;
 }
 
+export function generateExpenseId(expenses) {
+  const max = expenses.reduce((acc, e) => Math.max(acc, parseInt(e.id?.replace('EXP-', '') || '0', 10)), 0);
+  return `EXP-${String(max + 1).padStart(4, '0')}`;
+}
+
+export function getPaymentExpenses(expenses, paymentId) {
+  return expenses.filter(e => e.paymentId === paymentId).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+}
+
+export function calcPaymentProfit(payment, expenses) {
+  const totalExpenses = getPaymentExpenses(expenses, payment.id);
+  const revenue = Number(payment.advance || 0);
+  const profit = revenue - totalExpenses;
+  const margin = revenue > 0 ? Math.round((profit / revenue) * 100 * 100) / 100 : 0;
+  return { revenue, expenses: totalExpenses, profit, margin };
+}
+
 export function formatCurrency(amount) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(amount || 0);
 }
@@ -75,9 +92,16 @@ export function formatDate(dateStr) {
   try { return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return dateStr; }
 }
 
-function computeStats(clients, crm, payments, invoices) {
+function computeStats(clients, crm, payments, invoices, expenses) {
+  const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+  const totalRevenue = payments.reduce((sum, p) => sum + (p.advance || 0), 0);
+  const netProfit = totalRevenue - totalExpenses;
+  const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100 * 100) / 100 : 0;
   return {
-    totalRevenue: payments.reduce((sum, p) => sum + (p.advance || 0), 0),
+    totalRevenue,
+    totalExpenses,
+    netProfit,
+    profitMargin,
     totalInvoices: invoices.length,
     paidPayments: payments.filter(p => p.status === 'Paid').reduce((sum, p) => sum + (p.finalAmount || 0), 0),
     pendingPayments: payments.filter(p => p.status !== 'Paid').reduce((sum, p) => sum + (p.due || 0), 0),
@@ -96,17 +120,19 @@ export function StoreProvider({ children }) {
   const [payments, setPaymentsState] = useState([]);
   const [invoices, setInvoicesState] = useState([]);
   const [services, setServicesState] = useState([]);
+  const [expenses, setExpensesState] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     async function init() {
-      let [c, cr, p, i, s] = await Promise.all([
+      let [c, cr, p, i, s, e] = await Promise.all([
         fetchAll('clients'),
         fetchAll('crm'),
         fetchAll('payments'),
         fetchAll('invoices'),
         fetchAll('services'),
+        fetchAll('expenses'),
       ]);
       const hasLocal = typeof window !== 'undefined' && localStorage.getItem('mc_clients');
       if (c.length === 0 && hasLocal) {
@@ -115,6 +141,7 @@ export function StoreProvider({ children }) {
         const localPayments = JSON.parse(localStorage.getItem('mc_payments') || '[]');
         const localInvoices = JSON.parse(localStorage.getItem('mc_invoices') || '[]');
         const localServices = JSON.parse(localStorage.getItem('mc_services') || '[]');
+        const localExpenses = JSON.parse(localStorage.getItem('mc_expenses') || '[]');
         if (localClients.length > 0) {
           const { error: ce } = await supabase.from('clients').insert(localClients.map(objToDb));
           if (!ce) c = localClients;
@@ -135,6 +162,10 @@ export function StoreProvider({ children }) {
           const { error: se } = await supabase.from('services').insert(localServices.map(objToDb));
           if (!se) s = localServices;
         }
+        if (localExpenses.length > 0) {
+          const { error: ee } = await supabase.from('expenses').insert(localExpenses.map(objToDb));
+          if (!ee) e = localExpenses;
+        }
       }
       if (!cancelled) {
         setClientsState(c);
@@ -142,6 +173,7 @@ export function StoreProvider({ children }) {
         setPaymentsState(p);
         setInvoicesState(i);
         setServicesState(s);
+        setExpensesState(e);
         setLoading(false);
       }
     }
@@ -250,16 +282,35 @@ export function StoreProvider({ children }) {
     setServicesState(prev => prev.filter(s => s.id !== id));
   }, []);
 
-  const stats = computeStats(clients, crm, payments, invoices);
+  const addExpense = useCallback(async (expense) => {
+    const { error } = await supabase.from('expenses').insert([objToDb(expense)]);
+    if (error) { logErr('addExpense error', error); return; }
+    setExpensesState(prev => [...prev, expense]);
+  }, []);
+
+  const updateExpense = useCallback(async (id, data) => {
+    const { error } = await supabase.from('expenses').update(objToDb(data)).eq('id', id);
+    if (error) { logErr('updateExpense error', error); return; }
+    setExpensesState(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+  }, []);
+
+  const deleteExpense = useCallback(async (id) => {
+    const { error } = await supabase.from('expenses').delete().eq('id', id);
+    if (error) { logErr('deleteExpense error', error); return; }
+    setExpensesState(prev => prev.filter(e => e.id !== id));
+  }, []);
+
+  const stats = computeStats(clients, crm, payments, invoices, expenses);
 
   return (
     <StoreContext.Provider value={{
-      clients, crm, payments, invoices, services, stats, loading,
+      clients, crm, payments, invoices, services, expenses, stats, loading,
       addClient, updateClient, deleteClient, deleteClients,
       addCrmEntry, updateCrmEntry, deleteCrmEntry,
       addPayment, updatePayment, deletePayment,
       addInvoice, updateInvoice, deleteInvoice,
       addService, updateService, deleteService,
+      addExpense, updateExpense, deleteExpense,
     }}>
       {children}
     </StoreContext.Provider>

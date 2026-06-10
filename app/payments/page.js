@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useStore, formatCurrency, formatDate } from '@/app/lib/store';
+import { useStore, formatCurrency, formatDate, getPaymentExpenses, calcPaymentProfit } from '@/app/lib/store';
 import DataTable from '@/app/components/ui/DataTable';
 import StatCard from '@/app/components/ui/StatCard';
 import Button from '@/app/components/ui/Button';
@@ -13,7 +13,7 @@ import { useToast } from '@/app/components/ui/Toast';
 import {
   CreditCard, DollarSign, Clock, AlertTriangle,
   Download, Pencil, CheckCircle, ArrowRightCircle,
-  Landmark, Smartphone, Wallet, Ban as Bank
+  Landmark, Smartphone, Wallet, Ban as Bank, Receipt, Eye
 } from 'lucide-react';
 
 const PAYMENT_STATUSES = ['Paid', 'Partial', 'Pending', 'Overdue'];
@@ -22,7 +22,7 @@ const PAYMENT_MODES = ['UPI', 'Bank Transfer', 'Cash', 'Cheque'];
 const MODE_ICONS = { 'UPI': Smartphone, 'Bank Transfer': Landmark, 'Cash': Wallet, 'Cheque': Bank };
 
 export default function PaymentsPage() {
-  const { clients, payments, invoices, updatePayment, updateInvoice } = useStore();
+  const { clients, payments, invoices, expenses, updatePayment, updateInvoice } = useStore();
   const toast = useToast();
   const [showModal, setShowModal] = useState(false);
   const [editPayment, setEditPayment] = useState(null);
@@ -35,6 +35,7 @@ export default function PaymentsPage() {
   const [fullPayId, setFullPayId] = useState(null);
   const [fullPayMode, setFullPayMode] = useState('');
   const [fullPayDate, setFullPayDate] = useState('');
+  const [expenseViewPayment, setExpenseViewPayment] = useState(null);
 
   const filtered = payments.filter(p => {
     const client = clients.find(c => c.id === p.clientId);
@@ -129,18 +130,27 @@ export default function PaymentsPage() {
     { key: 'invoiceNo', label: 'Invoice', width: 110, render: (v) => <span style={{ fontSize: 12, color: '#22C55E' }}>{v || '—'}</span> },
     { key: 'finalAmount', label: 'Amount', width: 100, render: (v) => <span style={{ fontWeight: 600 }}>{formatCurrency(v)}</span> },
     { key: 'advance', label: 'Received', width: 100, render: (v) => <span style={{ color: '#22C55E' }}>{formatCurrency(v)}</span> },
-    { key: 'due', label: 'Due', width: 100, render: (v, r) => (
+    { key: 'expenses', label: 'Expenses', width: 90, render: (_, row) => {
+      const amt = getPaymentExpenses(expenses, row.id);
+      return amt > 0 ? <span style={{ color: '#EF4444', fontWeight: 600 }}>{formatCurrency(amt)}</span> : <span style={{ color: '#6B7280' }}>—</span>;
+    }},
+    { key: 'profit', label: 'Net Profit', width: 100, render: (_, row) => {
+      const { profit, margin } = calcPaymentProfit(row, expenses);
+      const color = profit > 0 ? '#22C55E' : profit < 0 ? '#EF4444' : '#6B7280';
+      return (
+        <div>
+          <div style={{ color, fontWeight: 600, fontSize: 13 }}>{formatCurrency(profit)}</div>
+          <div style={{ fontSize: 10, color: margin > 0 ? '#22C55E' : '#6B7280' }}>{margin > 0 ? `${margin}%` : '—'}</div>
+        </div>
+      );
+    }},
+    { key: 'due', label: 'Due', width: 90, render: (v, r) => (
       <span style={{ color: r.status !== 'Paid' && Number(v) > 0 ? '#EF4444' : '#6B7280', fontWeight: r.status !== 'Paid' && Number(v) > 0 ? 600 : 400 }}>
         {Number(v) > 0 ? formatCurrency(v) : '—'}
       </span>
     )},
-    { key: 'dueDate', label: 'Due Date', width: 100, render: (v, r) => (
-      <span style={{ fontSize: 12, color: v && new Date(v) < new Date() && r.status !== 'Paid' ? '#EF4444' : '#9CA3AF' }}>
-        {formatDate(v)}
-      </span>
-    )},
     { key: 'status', label: 'Status', width: 90, render: (v) => <Badge status={v.toLowerCase()} /> },
-    { key: 'mode', label: 'Mode', width: 100, render: (v) => {
+    { key: 'mode', label: 'Mode', width: 80, render: (v) => {
       const Icon = MODE_ICONS[v];
       return v ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -197,6 +207,7 @@ export default function PaymentsPage() {
             emptyIcon={CreditCard}
             actions={(row) => (
               <div style={{ display: 'flex', gap: 4 }}>
+                <button className="btn-icon" style={{ color: '#EF4444' }} onClick={() => setExpenseViewPayment(row)} title="View Expenses"><Receipt size={14} /></button>
                 <button className="btn-icon" onClick={() => openEdit(row)} title="Edit"><Pencil size={14} /></button>
                 {row.status === 'Partial' && (
                   <button className="btn-icon" style={{ color: '#22C55E' }} onClick={() => {
@@ -288,6 +299,70 @@ export default function PaymentsPage() {
               <ModalFooter>
                 <Button variant="secondary" onClick={() => { setFullPayId(null); setFullPayMode(''); setFullPayDate(''); }}>Cancel</Button>
                 <Button onClick={handleFullPayment}>Confirm Full Payment</Button>
+              </ModalFooter>
+            </>
+          );
+        })()}
+      </Modal>
+
+      {/* Expense View Modal */}
+      <Modal open={!!expenseViewPayment} onClose={() => setExpenseViewPayment(null)}
+        title="Project Expenses" size="md">
+        {expenseViewPayment && (() => {
+          const p = expenseViewPayment;
+          const paymentExpenses = expenses.filter(e => e.paymentId === p.id);
+          const { revenue, expenses: totalExp, profit, margin } = calcPaymentProfit(p, expenses);
+          return (
+            <>
+              <div style={{ marginBottom: 16, padding: 12, background: 'rgba(255,255,255,0.03)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{getClientName(p.clientId)}</div>
+                <div style={{ fontSize: 12, color: '#22C55E', marginTop: 2 }}>{p.invoiceNo}</div>
+                <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 12 }}>
+                  <span>Received: <strong style={{ color: '#22C55E' }}>{formatCurrency(revenue)}</strong></span>
+                  <span>Expenses: <strong style={{ color: '#EF4444' }}>{formatCurrency(totalExp)}</strong></span>
+                  <span>Profit: <strong style={{ color: profit >= 0 ? '#22C55E' : '#EF4444' }}>{formatCurrency(profit)}</strong></span>
+                  <span>Margin: <strong style={{ color: margin > 0 ? '#22C55E' : '#6B7280' }}>{margin}%</strong></span>
+                </div>
+              </div>
+              {paymentExpenses.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: 24, color: '#6B7280', fontSize: 13 }}>
+                  No expenses recorded for this project
+                </div>
+              ) : (
+                <div className="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Vendor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {paymentExpenses.map(e => (
+                        <tr key={e.id}>
+                          <td><span className="badge" style={{ background: 'rgba(239,68,68,0.12)', color: '#EF4444', padding: '2px 6px', borderRadius: 4, fontSize: 11 }}>{e.category}</span></td>
+                          <td style={{ fontSize: 12, color: '#9CA3AF' }}>{e.description || '—'}</td>
+                          <td style={{ color: '#EF4444', fontWeight: 600 }}>{formatCurrency(e.amount)}</td>
+                          <td style={{ fontSize: 12 }}>{formatDate(e.date)}</td>
+                          <td style={{ fontSize: 12 }}>{e.vendor || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={2} style={{ textAlign: 'right', fontWeight: 700, padding: '8px 12px', borderTop: '1px solid var(--border)' }}>Total</td>
+                        <td style={{ fontWeight: 700, color: '#EF4444', padding: '8px 12px', borderTop: '1px solid var(--border)' }}>{formatCurrency(totalExp)}</td>
+                        <td colSpan={2} style={{ borderTop: '1px solid var(--border)' }}></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+              <ModalFooter>
+                <Button variant="secondary" onClick={() => setExpenseViewPayment(null)}>Close</Button>
               </ModalFooter>
             </>
           );

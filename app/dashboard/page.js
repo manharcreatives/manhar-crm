@@ -1,14 +1,15 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useStore, formatCurrency, formatDate } from '@/app/lib/store';
+import { useStore, formatCurrency, formatDate, getPaymentExpenses, calcPaymentProfit } from '@/app/lib/store';
 import StatCard from '@/app/components/ui/StatCard';
 import { Card, CardHeader } from '@/app/components/ui/Card';
 import { useToast } from '@/app/components/ui/Toast';
 import Link from 'next/link';
 import {
   DollarSign, FileText, CheckCircle, Clock, Users, TrendingUp,
-  UserPlus, CreditCard, Target, Calendar, LayoutDashboard
+  UserPlus, CreditCard, Target, Calendar, LayoutDashboard,
+  TrendingDown, Receipt, Percent
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -38,7 +39,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function DashboardPage() {
-  const { clients, crm, payments, invoices, services, stats } = useStore();
+  const { clients, crm, payments, invoices, services, expenses, stats } = useStore();
   useToast();
 
   const monthlyData = MONTHS.map((month, idx) => {
@@ -51,7 +52,13 @@ export default function DashboardPage() {
         return date && date.getMonth() === idx;
       })
       .reduce((sum, p) => sum + (p.advance || 0), 0);
-    return { month, revenue, received };
+    const monthExpenses = expenses
+      .filter(e => {
+        const date = e.date ? new Date(e.date) : null;
+        return date && date.getMonth() === idx;
+      })
+      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    return { month, revenue, received, expenses: monthExpenses };
   });
 
   const paidCount = payments.filter(p => p.status === 'Paid').length;
@@ -66,31 +73,8 @@ export default function DashboardPage() {
     { name: 'Overdue', value: overdueCount, color: '#EF4444' },
   ].filter(d => d.value > 0);
 
-  const categoryMap = {};
-  payments.forEach(p => {
-    const cat = p.category || 'Other';
-    categoryMap[cat] = (categoryMap[cat] || 0) + (p.finalAmount || 0);
-  });
-  const categoryData = Object.entries(categoryMap).map(([name, value]) => ({
-    name: name.split(' ').slice(0, 2).join(' '), value
-  }));
-
   const recentInvoices = [...invoices]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 5);
-
-  const clientRevMap = {};
-  payments.forEach(p => {
-    if (!clientRevMap[p.clientId]) clientRevMap[p.clientId] = { revenue: 0, projects: 0 };
-    clientRevMap[p.clientId].revenue += (p.finalAmount || 0);
-    clientRevMap[p.clientId].projects += 1;
-  });
-  const topClients = Object.entries(clientRevMap)
-    .map(([id, data]) => {
-      const client = clients.find(c => c.id === id);
-      return { id, name: client?.name || id, business: client?.business || '', ...data };
-    })
-    .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
   const upcomingFollowups = crm
@@ -120,10 +104,47 @@ export default function DashboardPage() {
       const todayReceived = payments
         .filter(p => p.paymentDate === todayStr)
         .reduce((sum, p) => sum + (p.advance || 0), 0);
-      return [{ month: 'Today', revenue: todayRevenue, received: todayReceived }];
+      const todayExpenses = expenses
+        .filter(e => e.date === todayStr)
+        .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+      return [{ month: 'Today', revenue: todayRevenue, received: todayReceived, expenses: todayExpenses }];
     }
     return monthlyData;
-  }, [monthlyData, revenuePeriod, invoices, payments]);
+  }, [monthlyData, revenuePeriod, invoices, payments, expenses]);
+
+  const profitCategories = {};
+  payments.forEach(p => {
+    const cat = p.category || 'Other';
+    if (!profitCategories[cat]) profitCategories[cat] = { revenue: 0, expenses: 0 };
+    profitCategories[cat].revenue += (p.advance || 0);
+    profitCategories[cat].expenses += getPaymentExpenses(expenses, p.id);
+  });
+  const profitCategoryData = Object.entries(profitCategories)
+    .map(([name, data]) => ({
+      name: name.split(' ').slice(0, 2).join(' '),
+      revenue: data.revenue,
+      expenses: data.expenses,
+      profit: data.revenue - data.expenses,
+      margin: data.revenue > 0 ? Math.round(((data.revenue - data.expenses) / data.revenue) * 100) : 0,
+    }))
+    .sort((a, b) => b.profit - a.profit);
+
+  const clientProfitMap = {};
+  payments.forEach(p => {
+    if (!clientProfitMap[p.clientId]) clientProfitMap[p.clientId] = { revenue: 0, expenses: 0, projects: 0 };
+    clientProfitMap[p.clientId].revenue += (p.advance || 0);
+    clientProfitMap[p.clientId].expenses += getPaymentExpenses(expenses, p.id);
+    clientProfitMap[p.clientId].projects += 1;
+  });
+  const topProfitClients = Object.entries(clientProfitMap)
+    .map(([id, data]) => {
+      const client = clients.find(c => c.id === id);
+      const profit = data.revenue - data.expenses;
+      const margin = data.revenue > 0 ? Math.round((profit / data.revenue) * 100) : 0;
+      return { id, name: client?.name || id, business: client?.business || '', ...data, profit, margin };
+    })
+    .sort((a, b) => b.profit - a.profit)
+    .slice(0, 5);
 
   const clientRetention = clients.length > 0
     ? Math.round((crm.filter(c => c.leadStatus === 'Converted').length / clients.length) * 100)
@@ -176,11 +197,11 @@ export default function DashboardPage() {
 
         {/* Top Stats */}
         <div className="stats-grid">
-          <StatCard icon={DollarSign} color="green" value={stats.totalRevenue} label="Total Revenue" trend={12} />
-          <StatCard icon={FileText} color="blue" value={stats.totalInvoices} label="Total Invoices" />
-          <StatCard icon={CheckCircle} color="green" value={stats.paidPayments} label="Paid Payments" prefix="₹" />
+          <StatCard icon={DollarSign} color="green" value={stats.totalRevenue} label="Total Revenue" prefix="₹" />
+          <StatCard icon={TrendingDown} color="red" value={stats.totalExpenses} label="Total Expenses" prefix="₹" />
+          <StatCard icon={TrendingUp} color={stats.netProfit >= 0 ? 'green' : 'red'} value={stats.netProfit} label="Net Profit" prefix="₹" />
+          <StatCard icon={Percent} color={stats.profitMargin > 0 ? 'green' : 'yellow'} value={stats.profitMargin} label="Profit Margin" suffix="%" />
           <StatCard icon={Clock} color="yellow" value={stats.pendingPayments} label="Pending Payments" prefix="₹" />
-          <StatCard icon={TrendingUp} color="purple" value={stats.avgInvoice} label="Avg Invoice Value" prefix="₹" />
         </div>
 
         {/* Charts */}
@@ -212,6 +233,10 @@ export default function DashboardPage() {
                     <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.2} />
                     <stop offset="95%" stopColor="#3B82F6" stopOpacity={0} />
                   </linearGradient>
+                  <linearGradient id="expG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0} />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                 <XAxis dataKey="month" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
@@ -219,6 +244,7 @@ export default function DashboardPage() {
                 <Tooltip content={<CustomTooltip />} />
                 <Area type="monotone" dataKey="revenue" name="Invoice Value" stroke="#22C55E" strokeWidth={2} fill="url(#revG)" />
                 <Area type="monotone" dataKey="received" name="Received" stroke="#3B82F6" strokeWidth={2} fill="url(#recG)" />
+                <Area type="monotone" dataKey="expenses" name="Expenses" stroke="#EF4444" strokeWidth={2} fill="url(#expG)" />
               </AreaChart>
             </ResponsiveContainer>
           </Card>
@@ -246,25 +272,46 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Service Revenue */}
-        <Card className="mb-6">
-          <CardHeader title="Revenue by Service Category" />
-          {categoryData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={categoryData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis type="number" tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={v => `₹${v/1000}k`} axisLine={false} tickLine={false} />
-                <YAxis dataKey="name" type="category" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} width={130} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" name="Revenue" fill="#22C55E" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="empty-state-compact" style={{ padding: 40, textAlign: 'center', color: '#6B7280' }}>
-              No service data yet
-            </div>
-          )}
-        </Card>
+        {/* Top Profitable Services */}
+        <div className="grid-2 mb-6">
+          <Card>
+            <CardHeader title="Top Profitable Services" subtitle="Revenue vs Expenses by category" />
+            {profitCategoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={profitCategoryData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis type="number" tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={v => `₹${v/1000}k`} axisLine={false} tickLine={false} />
+                  <YAxis dataKey="name" type="category" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} width={120} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="revenue" name="Revenue" fill="#22C55E" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="expenses" name="Expenses" fill="#EF4444" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="empty-state-compact" style={{ padding: 40, textAlign: 'center', color: '#6B7280' }}>
+                No service data yet
+              </div>
+            )}
+          </Card>
+          <Card>
+            <CardHeader title="Profit Margin by Service" />
+            {profitCategoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={profitCategoryData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis type="number" tick={{ fill: '#6B7280', fontSize: 11 }} tickFormatter={v => `${v}%`} axisLine={false} tickLine={false} domain={[0, 100]} />
+                  <YAxis dataKey="name" type="category" tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} width={120} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="margin" name="Margin %" fill="#A78BFA" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="empty-state-compact" style={{ padding: 40, textAlign: 'center', color: '#6B7280' }}>
+                No service data yet
+              </div>
+            )}
+          </Card>
+        </div>
 
         {/* Tables + Follow-ups */}
         <div className="grid-2 mb-6">
@@ -337,22 +384,25 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Top Clients */}
+        {/* Top Profitable Clients */}
         <Card className="mb-6">
-          <CardHeader title="Top Clients by Revenue" />
+          <CardHeader title="Top Profitable Clients" subtitle="Ranked by net profit" />
           <div className="table-wrapper">
             <table>
               <thead>
                 <tr>
                   <th>Client</th>
                   <th>Revenue</th>
+                  <th>Expenses</th>
+                  <th>Net Profit</th>
+                  <th>Margin</th>
                   <th>Projects</th>
                 </tr>
               </thead>
               <tbody>
-                {topClients.length === 0 ? (
-                  <tr><td colSpan={3} style={{ textAlign: 'center', color: '#6B7280', padding: 24 }}>No client data</td></tr>
-                ) : topClients.map(c => (
+                {topProfitClients.length === 0 ? (
+                  <tr><td colSpan={6} style={{ textAlign: 'center', color: '#6B7280', padding: 24 }}>No client data</td></tr>
+                ) : topProfitClients.map(c => (
                   <tr key={c.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -364,6 +414,15 @@ export default function DashboardPage() {
                       </div>
                     </td>
                     <td style={{ color: '#22C55E', fontWeight: 600 }}>{formatCurrency(c.revenue)}</td>
+                    <td style={{ color: '#EF4444' }}>{formatCurrency(c.expenses)}</td>
+                    <td style={{ color: c.profit >= 0 ? '#22C55E' : '#EF4444', fontWeight: 700 }}>{formatCurrency(c.profit)}</td>
+                    <td>
+                      <span className="badge" style={{
+                        background: c.margin >= 50 ? 'rgba(34,197,94,0.15)' : c.margin >= 20 ? 'rgba(245,158,11,0.15)' : 'rgba(239,68,68,0.15)',
+                        color: c.margin >= 50 ? '#22C55E' : c.margin >= 20 ? '#F59E0B' : '#EF4444',
+                        padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 600
+                      }}>{c.margin}%</span>
+                    </td>
                     <td>{c.projects}</td>
                   </tr>
                 ))}
@@ -374,10 +433,10 @@ export default function DashboardPage() {
 
         {/* Bottom Stats */}
         <div className="stats-grid">
+          <StatCard icon={DollarSign} color="blue" value={stats.totalInvoices} label="Total Invoices" />
           <StatCard icon={FileText} color="blue" value={stats.totalProjects} label="Total Projects" />
           <StatCard icon={CheckCircle} color="green" value={stats.completedProjects} label="Completed" />
           <StatCard icon={Clock} color="yellow" value={stats.ongoingProjects} label="Ongoing" />
-          <StatCard icon={Calendar} color="purple" value={stats.upcomingProjects} label="Upcoming" />
           <StatCard icon={TrendingUp} color="teal" value={`${clientRetention}%`} label="Client Retention" />
           <StatCard icon={Users} color="green" value={clients.length} label="Total Leads" />
         </div>
