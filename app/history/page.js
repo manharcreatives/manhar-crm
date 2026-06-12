@@ -293,7 +293,7 @@ export default function InvoiceHistoryPage() {
 
   <div style="padding:8px 15px 12px;display:flex;justify-content:center;border-top:1px solid #eee">
     <div style="text-align:center">
-      <img src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_png/v1779208013/1000223413-removebg-preview_nthrxg.png" alt="Signature" style="height:30px;width:auto;object-fit:contain;display:block;margin:0 auto 4px" />
+      <img src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_png/v1779208013/1000223413-removebg-preview_nthrxg.png" alt="Signature" style="height:60px;width:auto;object-fit:contain;display:block;margin:0 auto 4px" />
       <div style="font-size:9px;color:#888">Authorized Signature</div>
       <div style="font-size:10px;font-weight:700;color:#333;margin-top:2px">Manhar Creatives</div>
     </div>
