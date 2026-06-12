@@ -293,10 +293,7 @@ export default function InvoiceHistoryPage() {
 
   <div style="padding:8px 15px 12px;display:flex;justify-content:center;border-top:1px solid #eee">
     <div style="text-align:center">
-      <svg width="120" height="32" viewBox="0 0 120 32" style="display:block;margin:0 auto 4px">
-        <path d="M8 24 Q16 8 24 20 Q32 4 40 18 Q48 6 56 16 Q64 10 72 14 Q80 8 88 12 Q94 15 96 13 Q100 10 104 14"
-          stroke="#22C55E" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <img src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_png/v1779208013/1000223413-removebg-preview_nthrxg.png" alt="Signature" style="height:30px;width:auto;object-fit:contain;display:block;margin:0 auto 4px" />
       <div style="font-size:9px;color:#888">Authorized Signature</div>
       <div style="font-size:10px;font-weight:700;color:#333;margin-top:2px">Manhar Creatives</div>
     </div>

@@ -100,7 +100,7 @@ export default function InvoicePage() {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=210mm">
   <title>${invoiceNo} — Manhar Creatives</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@700;800;900&family=Dancing+Script:wght@400;700&display=swap" rel="stylesheet">
   <style>
     *, *::before, *::after { box-sizing: border-box; }
     html {
@@ -341,10 +341,8 @@ ${el.outerHTML}
 
               <div style={{ padding: '16px 40px 32px', display: 'flex', justifyContent: 'center', borderTop: '1px solid #f3f4f6' }}>
                 <div style={{ textAlign: 'center' }}>
-                  <svg width="140" height="40" viewBox="0 0 140 40" style={{ marginBottom: 4 }}>
-                    <path d="M10 30 Q20 10 30 25 Q40 5 50 22 Q60 8 70 20 Q80 12 90 18 Q100 10 110 16 Q118 20 120 18 Q125 14 130 20"
-                      stroke="#22C55E" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_png/v1779208013/1000223413-removebg-preview_nthrxg.png" alt="Signature" style={{ height: 34, width: 'auto', objectFit: 'contain', marginBottom: 4 }} />
                   <div style={{ fontSize: 11, color: '#888' }}>Authorized Signature</div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginTop: 2 }}>Manhar Creatives</div>
                 </div>
