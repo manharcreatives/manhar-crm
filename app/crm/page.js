@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useStore, formatDate } from '@/app/lib/store';
+import { useStore, formatDate, sanitizePhone } from '@/app/lib/store';
 import DataTable from '@/app/components/ui/DataTable';
 import Button from '@/app/components/ui/Button';
 import Badge from '@/app/components/ui/Badge';
@@ -151,8 +151,8 @@ export default function CRMPage() {
       return (
         <div style={{ display: 'flex', gap: 4 }}>
           <button className="btn-icon" onClick={() => openEdit(row.clientId)} title="Edit CRM"><Target size={14} /></button>
-          <a href={`tel:+91${client?.phone?.replace(/\s/g, '') || ''}`} className="btn-icon" style={{ color: '#3B82F6' }} title="Call"><Phone size={14} /></a>
-          <a href={`https://wa.me/91${client?.phone?.replace(/\s/g, '') || ''}`} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ color: '#25D366' }} title="WhatsApp"><MessageSquare size={14} /></a>
+          <a href={`tel:+91${sanitizePhone(client?.phone || '')}`} className="btn-icon" style={{ color: '#3B82F6' }} title="Call"><Phone size={14} /></a>
+          <a href={`https://wa.me/91${sanitizePhone(client?.phone || '')}`} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ color: '#25D366' }} title="WhatsApp"><MessageSquare size={14} /></a>
           <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(client?.email || '')}`} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ color: '#EA4335' }} title="Email"><Mail size={14} /></a>
         </div>
       );
@@ -257,8 +257,8 @@ export default function CRMPage() {
                             )}
                           </div>
                           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-                            <a href={`tel:+91${item.phone?.replace(/\s/g, '') || ''}`} className="btn-icon" style={{ width: 24, height: 24 }} title="Call"><Phone size={11} /></a>
-                            <a href={`https://wa.me/91${item.phone?.replace(/\s/g, '') || ''}`} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ width: 24, height: 24, color: '#25D366' }} title="WhatsApp"><MessageSquare size={11} /></a>
+                            <a href={`tel:+91${sanitizePhone(item.phone || '')}`} className="btn-icon" style={{ width: 24, height: 24 }} title="Call"><Phone size={11} /></a>
+                            <a href={`https://wa.me/91${sanitizePhone(item.phone || '')}`} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ width: 24, height: 24, color: '#25D366' }} title="WhatsApp"><MessageSquare size={11} /></a>
                             <a href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(item.email || '')}`} target="_blank" rel="noopener noreferrer" className="btn-icon" style={{ width: 24, height: 24, color: '#3B82F6' }} title="Email"><Mail size={11} /></a>
                           </div>
                         </div>

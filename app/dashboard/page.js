@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useStore, formatCurrency, formatDate, getPaymentExpenses, calcPaymentProfit } from '@/app/lib/store';
+import { useStore, formatCurrency, formatDate, getPaymentExpenses } from '@/app/lib/store';
 import StatCard from '@/app/components/ui/StatCard';
 import { Card, CardHeader } from '@/app/components/ui/Card';
 import { useToast } from '@/app/components/ui/Toast';
@@ -116,7 +116,7 @@ export default function DashboardPage() {
   payments.forEach(p => {
     const cat = p.category || 'Other';
     if (!profitCategories[cat]) profitCategories[cat] = { revenue: 0, expenses: 0 };
-    profitCategories[cat].revenue += (p.advance || 0);
+    profitCategories[cat].revenue += (p.finalAmount || p.projectValue || p.advance || 0);
     profitCategories[cat].expenses += getPaymentExpenses(expenses, p.id);
   });
   const profitCategoryData = Object.entries(profitCategories)
@@ -132,7 +132,7 @@ export default function DashboardPage() {
   const clientProfitMap = {};
   payments.forEach(p => {
     if (!clientProfitMap[p.clientId]) clientProfitMap[p.clientId] = { revenue: 0, expenses: 0, projects: 0 };
-    clientProfitMap[p.clientId].revenue += (p.advance || 0);
+    clientProfitMap[p.clientId].revenue += (p.finalAmount || p.projectValue || p.advance || 0);
     clientProfitMap[p.clientId].expenses += getPaymentExpenses(expenses, p.id);
     clientProfitMap[p.clientId].projects += 1;
   });

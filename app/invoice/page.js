@@ -73,11 +73,13 @@ export default function InvoicePage() {
     setSavedInvoiceNo(invoiceNo);
     setSaved(true);
 
+    const effectiveAdvance = paymentStatus === 'Paid'
+      ? Number(total) : Number(advancePaid || 0);
     const newPayment = {
       id: generatePaymentId(payments),
       clientId, invoiceNo, category: '', serviceName: servicesStr,
       projectValue: subtotal, discount: discountAmount, finalAmount: total,
-      advance: Number(advancePaid || 0), remaining: balance, due: paymentStatus === 'Paid' ? 0 : balance,
+      advance: effectiveAdvance, remaining: total - effectiveAdvance, due: paymentStatus === 'Paid' ? 0 : (total - effectiveAdvance),
       dueDate: dueDate || '', status: paymentStatus, mode: paymentMode,
       paymentDate: paymentStatus === 'Paid' ? invoiceDate : '',
       reminderStatus: 'None', latePayment: false,
@@ -339,8 +341,10 @@ ${el.outerHTML}
 
               <div style={{ padding: '16px 40px 32px', display: 'flex', justifyContent: 'center', borderTop: '1px solid #f3f4f6' }}>
                 <div style={{ textAlign: 'center' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_auto/v1779208013/1000223413-removebg-preview_nthrxg.png" alt="Signature" style={{ height: 36, width: 'auto', objectFit: 'contain', marginBottom: 4 }} />
+                  <svg width="140" height="40" viewBox="0 0 140 40" style={{ marginBottom: 4 }}>
+                    <path d="M10 30 Q20 10 30 25 Q40 5 50 22 Q60 8 70 20 Q80 12 90 18 Q100 10 110 16 Q118 20 120 18 Q125 14 130 20"
+                      stroke="#22C55E" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                   <div style={{ fontSize: 11, color: '#888' }}>Authorized Signature</div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginTop: 2 }}>Manhar Creatives</div>
                 </div>

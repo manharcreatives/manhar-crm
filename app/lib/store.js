@@ -77,7 +77,7 @@ export function getPaymentExpenses(expenses, paymentId) {
 
 export function calcPaymentProfit(payment, expenses) {
   const totalExpenses = getPaymentExpenses(expenses, payment.id);
-  const revenue = Number(payment.advance || 0);
+  const revenue = Number(payment.finalAmount || payment.projectValue || payment.advance || 0);
   const profit = revenue - totalExpenses;
   const margin = revenue > 0 ? Math.round((profit / revenue) * 100 * 100) / 100 : 0;
   return { revenue, expenses: totalExpenses, profit, margin };
@@ -87,6 +87,14 @@ export function formatCurrency(amount) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0 }).format(amount || 0);
 }
 
+export function sanitizePhone(phone) {
+  if (!phone) return '';
+  let cleaned = phone.replace(/[^\d]/g, '');
+  if (cleaned.startsWith('91') && cleaned.length > 10) cleaned = cleaned.slice(2);
+  else if (cleaned.startsWith('0')) cleaned = cleaned.slice(1);
+  return cleaned;
+}
+
 export function formatDate(dateStr) {
   if (!dateStr) return '\u2014';
   try { return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); } catch { return dateStr; }
@@ -94,7 +102,7 @@ export function formatDate(dateStr) {
 
 function computeStats(clients, crm, payments, invoices, expenses) {
   const totalExpenses = expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-  const totalRevenue = payments.reduce((sum, p) => sum + (p.advance || 0), 0);
+  const totalRevenue = payments.reduce((sum, p) => sum + (p.finalAmount || p.projectValue || p.advance || 0), 0);
   const netProfit = totalRevenue - totalExpenses;
   const profitMargin = totalRevenue > 0 ? Math.round((netProfit / totalRevenue) * 100 * 100) / 100 : 0;
   return {

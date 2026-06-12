@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useStore, formatCurrency, formatDate } from '@/app/lib/store';
+import { useStore, formatCurrency, formatDate, sanitizePhone } from '@/app/lib/store';
 import DataTable from '@/app/components/ui/DataTable';
 import StatCard from '@/app/components/ui/StatCard';
 import Button from '@/app/components/ui/Button';
@@ -25,7 +25,7 @@ const TERMS = [
 ];
 
 export default function InvoiceHistoryPage() {
-  const { clients, invoices, deleteInvoice } = useStore();
+  const { clients, invoices, payments, expenses, deleteInvoice, deletePayment, deleteExpense } = useStore();
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -54,7 +54,15 @@ export default function InvoiceHistoryPage() {
 
   async function handleDelete(id) {
     await deleteInvoice(id);
-    toast.success('Invoice deleted');
+    const payment = payments.find(p => p.invoiceNo === id);
+    if (payment) {
+      const linkedExpenses = expenses.filter(e => e.paymentId === payment.id);
+      for (const exp of linkedExpenses) {
+        await deleteExpense(exp.id);
+      }
+      await deletePayment(payment.id);
+    }
+    toast.success('Invoice deleted successfully');
     setDeleteTarget(null);
   }
 
@@ -285,7 +293,10 @@ export default function InvoiceHistoryPage() {
 
   <div style="padding:8px 15px 12px;display:flex;justify-content:center;border-top:1px solid #eee">
     <div style="text-align:center">
-      <div style="width:110px;border-bottom:1.5px solid #22C55E;margin-bottom:4px;height:26px"></div>
+      <svg width="120" height="32" viewBox="0 0 120 32" style="display:block;margin:0 auto 4px">
+        <path d="M8 24 Q16 8 24 20 Q32 4 40 18 Q48 6 56 16 Q64 10 72 14 Q80 8 88 12 Q94 15 96 13 Q100 10 104 14"
+          stroke="#22C55E" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
       <div style="font-size:9px;color:#888">Authorized Signature</div>
       <div style="font-size:10px;font-weight:700;color:#333;margin-top:2px">Manhar Creatives</div>
     </div>
@@ -343,7 +354,7 @@ export default function InvoiceHistoryPage() {
           }} title="Email"><Mail size={14} /></button>
           <button className="btn-icon" style={{ color: '#25D366' }} onClick={() => {
             if (!client) { toast.warning('Client not found'); return; }
-            window.open(`https://wa.me/91${(client.phone || '').replace(/\s/g, '')}?text=${encodeURIComponent(`Dear ${row.clientName}, Invoice ${row.id} for ₹${Number(row.final).toLocaleString('en-IN')}. Kindly check and pay. - Manhar Creatives`)}`, '_blank');
+            window.open(`https://wa.me/91${sanitizePhone(client.phone || '')}?text=${encodeURIComponent(`Dear ${row.clientName}, Invoice ${row.id} for ₹${Number(row.final).toLocaleString('en-IN')}. Kindly check and pay. - Manhar Creatives`)}`, '_blank');
           }} title="WhatsApp"><MessageCircle size={14} /></button>
           <button className="btn-icon" style={{ color: '#EF4444' }} onClick={() => setDeleteTarget(row.id)} title="Delete"><Trash2 size={14} /></button>
         </div>
