@@ -16,8 +16,9 @@ export default function InvoicePage() {
   const { clients, invoices, addInvoice, payments, addPayment } = useStore();
   const toast = useToast();
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const [clientId, setClientId] = useState('');
-  const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [invoiceDate, setInvoiceDate] = useState(todayStr);
   const [dueDate, setDueDate] = useState('');
   const [lines, setLines] = useState([{ ...EMPTY_LINE }]);
   const [discountType, setDiscountType] = useState('fixed');
@@ -54,6 +55,9 @@ export default function InvoicePage() {
   async function handleGenerate() {
     if (!clientId) { toast.warning('Please select a client'); return; }
     if (lines.every(l => !l.description)) { toast.warning('Add at least one service'); return; }
+    if (invoiceDate > todayStr) { toast.warning('Invoice date cannot be in the future'); return; }
+    if ((paymentStatus === 'Paid' || paymentStatus === 'Partial') && !paymentMode) { toast.warning('Please select a payment mode'); return; }
+    if (Number(advancePaid || 0) > total) { toast.warning('Advance cannot exceed the total amount'); return; }
 
     const invoiceNo = generateInvoiceNumber(invoices);
     const servicesStr = lines.filter(l => l.description).map(l => l.description).join(', ');
@@ -161,7 +165,7 @@ ${el.outerHTML}
     setNotes('');
     setPaymentStatus('Pending'); setPaymentMode(''); setAdvancePaid(0);
     setSaved(false); setSavedInvoiceNo('');
-    setInvoiceDate(new Date().toISOString().split('T')[0]);
+    setInvoiceDate(todayStr);
     setDueDate('');
   }
 
@@ -370,11 +374,11 @@ ${el.outerHTML}
               <div className="form-row">
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Invoice Date</label>
-                  <input className="form-input" type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} />
+                  <input className="form-input" type="date" value={invoiceDate} onChange={e => setInvoiceDate(e.target.value)} max={todayStr} />
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Due Date</label>
-                  <input className="form-input" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+                  <input className="form-input" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} min={invoiceDate} />
                 </div>
               </div>
             </Card>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useStore, formatCurrency, formatDate, getPaymentExpenses, calcPaymentProfit } from '@/app/lib/store';
+import ConfirmDialog from '@/app/components/ui/ConfirmDialog';
 import DataTable from '@/app/components/ui/DataTable';
 import StatCard from '@/app/components/ui/StatCard';
 import Button from '@/app/components/ui/Button';
@@ -13,7 +14,7 @@ import { useToast } from '@/app/components/ui/Toast';
 import {
   CreditCard, DollarSign, Clock, AlertTriangle,
   Download, Pencil, CheckCircle, ArrowRightCircle,
-  Landmark, Smartphone, Wallet, Ban as Bank, Receipt, Eye
+  Landmark, Smartphone, Wallet, Ban as Bank, Receipt, Eye, Trash2
 } from 'lucide-react';
 
 const PAYMENT_STATUSES = ['Paid', 'Partial', 'Pending', 'Overdue'];
@@ -22,7 +23,7 @@ const PAYMENT_MODES = ['UPI', 'Bank Transfer', 'Cash', 'Cheque'];
 const MODE_ICONS = { 'UPI': Smartphone, 'Bank Transfer': Landmark, 'Cash': Wallet, 'Cheque': Bank };
 
 export default function PaymentsPage() {
-  const { clients, payments, invoices, expenses, updatePayment, updateInvoice } = useStore();
+  const { clients, payments, invoices, expenses, updatePayment, updateInvoice, deletePayment, deleteExpense } = useStore();
   const toast = useToast();
   const [showModal, setShowModal] = useState(false);
   const [editPayment, setEditPayment] = useState(null);
@@ -36,6 +37,8 @@ export default function PaymentsPage() {
   const [fullPayMode, setFullPayMode] = useState('');
   const [fullPayDate, setFullPayDate] = useState('');
   const [expenseViewPayment, setExpenseViewPayment] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const filtered = payments.filter(p => {
     const client = clients.find(c => c.id === p.clientId);
@@ -61,6 +64,10 @@ export default function PaymentsPage() {
 
   async function handleSave() {
     if (!editPayment) return;
+    if (editDate && editDate > todayStr) { toast.warning('Payment date cannot be in the future'); return; }
+    if ((editStatus === 'Paid' || editStatus === 'Partial') && !editMode) { toast.warning('Please select a payment mode'); return; }
+    if (Number(editAdvance || 0) > Number(editPayment.finalAmount || 0)) { toast.warning('Advance cannot exceed the total amount'); return; }
+
     const remaining = Number(editPayment.finalAmount || 0) - Number(editAdvance || 0);
     const due = editStatus === 'Paid' ? 0 : remaining;
 
@@ -86,6 +93,8 @@ export default function PaymentsPage() {
     if (!fullPayId) return;
     const p = payments.find(x => x.id === fullPayId);
     if (!p) return;
+    if (!fullPayMode) { toast.warning('Please select a payment mode'); return; }
+    if (fullPayDate && fullPayDate > todayStr) { toast.warning('Payment date cannot be in the future'); return; }
     const advance = Number(p.finalAmount || 0);
 
     await updatePayment(p.id, {
@@ -104,6 +113,17 @@ export default function PaymentsPage() {
     setFullPayId(null);
     setFullPayMode('');
     setFullPayDate('');
+  }
+
+  async function handleDeletePayment() {
+    if (!deleteTarget) return;
+    const linkedExpenses = expenses.filter(e => e.paymentId === deleteTarget);
+    for (const exp of linkedExpenses) {
+      await deleteExpense(exp.id);
+    }
+    await deletePayment(deleteTarget);
+    toast.success('Payment and linked expenses deleted');
+    setDeleteTarget(null);
   }
 
   function exportExcel() {
@@ -209,6 +229,7 @@ export default function PaymentsPage() {
               <div style={{ display: 'flex', gap: 4 }}>
                 <button className="btn-icon" style={{ color: '#EF4444' }} onClick={() => setExpenseViewPayment(row)} title="View Expenses"><Receipt size={14} /></button>
                 <button className="btn-icon" onClick={() => openEdit(row)} title="Edit"><Pencil size={14} /></button>
+                <button className="btn-icon" style={{ color: '#EF4444' }} onClick={() => setDeleteTarget(row.id)} title="Delete"><Trash2 size={14} /></button>
                 {row.status === 'Partial' && (
                   <button className="btn-icon" style={{ color: '#22C55E' }} onClick={() => {
                     setFullPayId(row.id);
@@ -257,7 +278,7 @@ export default function PaymentsPage() {
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Payment Date</label>
-                <input className="form-input" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} />
+                <input className="form-input" type="date" value={editDate} onChange={e => setEditDate(e.target.value)} max={todayStr} />
               </div>
             </div>
             <ModalFooter>
@@ -293,7 +314,7 @@ export default function PaymentsPage() {
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label className="form-label">Payment Date</label>
-                  <input className="form-input" type="date" value={fullPayDate} onChange={e => setFullPayDate(e.target.value)} />
+                  <input className="form-input" type="date" value={fullPayDate} onChange={e => setFullPayDate(e.target.value)} max={todayStr} />
                 </div>
               </div>
               <ModalFooter>
@@ -368,6 +389,15 @@ export default function PaymentsPage() {
           );
         })()}
       </Modal>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDeletePayment}
+        title="Delete Payment"
+        message="This will permanently remove this payment and all linked expenses. This action cannot be undone."
+        confirmLabel="Delete Payment"
+      />
     </div>
   );
 }

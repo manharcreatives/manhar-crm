@@ -42,25 +42,6 @@ export default function DashboardPage() {
   const { clients, crm, payments, invoices, services, expenses, stats } = useStore();
   useToast();
 
-  const monthlyData = MONTHS.map((month, idx) => {
-    const revenue = invoices
-      .filter(inv => new Date(inv.date).getMonth() === idx)
-      .reduce((sum, inv) => sum + (inv.final || 0), 0);
-    const received = payments
-      .filter(p => {
-        const date = p.paymentDate ? new Date(p.paymentDate) : null;
-        return date && date.getMonth() === idx;
-      })
-      .reduce((sum, p) => sum + (p.advance || 0), 0);
-    const monthExpenses = expenses
-      .filter(e => {
-        const date = e.date ? new Date(e.date) : null;
-        return date && date.getMonth() === idx;
-      })
-      .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-    return { month, revenue, received, expenses: monthExpenses };
-  });
-
   const paidCount = payments.filter(p => p.status === 'Paid').length;
   const partialCount = payments.filter(p => p.status === 'Partial').length;
   const pendingCount = payments.filter(p => p.status === 'Pending').length;
@@ -83,34 +64,73 @@ export default function DashboardPage() {
     .slice(0, 5)
     .map(c => ({ ...c, client: clients.find(cl => cl.id === c.clientId) }));
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const [today, setToday] = useState('');
-  const [revenuePeriod, setRevenuePeriod] = useState('year');
+  const [rangePreset, setRangePreset] = useState('year');
+  const [rangeStart, setRangeStart] = useState(() => {
+    const d = new Date(); d.setMonth(0, 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [rangeEnd, setRangeEnd] = useState(todayStr);
 
   useEffect(() => {
     setToday(new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
   }, []);
 
-  const filteredMonthlyData = useMemo(() => {
+  function setDateRange(preset) {
+    setRangePreset(preset);
     const now = new Date();
-    if (revenuePeriod === 'month') {
-      const currentMonth = now.getMonth();
-      return monthlyData.filter((_, idx) => idx === currentMonth);
+    let start;
+    switch (preset) {
+      case 'today':
+        start = now;
+        break;
+      case 'week':
+        start = new Date(now); start.setDate(now.getDate() - now.getDay());
+        break;
+      case 'month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+      default:
+        start = new Date(now.getFullYear(), 0, 1);
+        break;
     }
-    if (revenuePeriod === 'today') {
-      const todayStr = now.toISOString().split('T')[0];
-      const todayRevenue = invoices
-        .filter(inv => inv.date === todayStr)
-        .reduce((sum, inv) => sum + (inv.final || 0), 0);
-      const todayReceived = payments
-        .filter(p => p.paymentDate === todayStr)
-        .reduce((sum, p) => sum + (p.advance || 0), 0);
-      const todayExpenses = expenses
-        .filter(e => e.date === todayStr)
-        .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
-      return [{ month: 'Today', revenue: todayRevenue, received: todayReceived, expenses: todayExpenses }];
+    setRangeStart(start.toISOString().split('T')[0]);
+    setRangeEnd(todayStr);
+  }
+
+  function handleRangeStart(e) {
+    setRangeStart(e.target.value);
+    setRangePreset('custom');
+  }
+
+  function handleRangeEnd(e) {
+    setRangeEnd(e.target.value);
+    setRangePreset('custom');
+  }
+
+  const filteredMonthlyData = useMemo(() => {
+    if (!rangeStart || !rangeEnd) return [];
+    const s = new Date(rangeStart);
+    const e = new Date(rangeEnd);
+    const months = [];
+    let cur = new Date(s.getFullYear(), s.getMonth(), 1);
+    const endMonth = new Date(e.getFullYear(), e.getMonth(), 1);
+    while (cur <= endMonth) {
+      const mi = cur.getMonth();
+      const yr = cur.getFullYear();
+      const monthName = MONTHS[mi] + (yr !== new Date().getFullYear() ? ` ${yr}` : '');
+      months.push({
+        month: monthName,
+        revenue: invoices.filter(inv => { const d = new Date(inv.date); return d >= s && d <= e && d.getMonth() === mi && d.getFullYear() === yr; }).reduce((sum, inv) => sum + (inv.final || 0), 0),
+        received: payments.filter(p => { if (!p.paymentDate) return false; const d = new Date(p.paymentDate); return d >= s && d <= e && d.getMonth() === mi && d.getFullYear() === yr; }).reduce((sum, p) => sum + (p.advance || 0), 0),
+        expenses: expenses.filter(ex => { if (!ex.date) return false; const d = new Date(ex.date); return d >= s && d <= e && d.getMonth() === mi && d.getFullYear() === yr; }).reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0),
+      });
+      cur.setMonth(cur.getMonth() + 1);
     }
-    return monthlyData;
-  }, [monthlyData, revenuePeriod, invoices, payments, expenses]);
+    return months;
+  }, [rangeStart, rangeEnd, invoices, payments, expenses]);
 
   const profitCategories = {};
   payments.forEach(p => {
@@ -207,18 +227,41 @@ export default function DashboardPage() {
         {/* Charts */}
         <div className="grid-2 mb-6">
           <Card>
-            <CardHeader title="Revenue Overview" subtitle="Monthly — FY 2026-27"
+            <CardHeader title="Revenue Overview"
+              subtitle={rangeStart && rangeEnd ? `${new Date(rangeStart).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} — ${new Date(rangeEnd).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Select a date range'}
               action={
-                <div style={{ display: 'flex', gap: 6 }}>
-                  {['today', 'month', 'year'].map(p => (
-                    <button key={p} onClick={() => setRevenuePeriod(p)}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {[
+                      { key: 'today', label: 'Today' },
+                      { key: 'week', label: 'This Week' },
+                      { key: 'month', label: 'This Month' },
+                      { key: 'year', label: 'This Year' },
+                    ].map(p => (
+                      <button key={p.key} onClick={() => setDateRange(p.key)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                          fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap',
+                          background: rangePreset === p.key ? 'var(--primary)' : 'var(--bg-card)',
+                          color: rangePreset === p.key ? '#0B0F0E' : 'var(--text-secondary)',
+                        }}>{p.label}</button>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-secondary)' }}>
+                    <input type="date" value={rangeStart} onChange={handleRangeStart}
                       style={{
-                        padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
-                        fontSize: 11, fontWeight: 600,
-                        background: revenuePeriod === p ? 'var(--primary)' : 'var(--bg-card)',
-                        color: revenuePeriod === p ? '#0B0F0E' : 'var(--text-secondary)',
-                      }}>{p === 'today' ? 'Today' : p === 'month' ? 'This Month' : 'This Year'}</button>
-                  ))}
+                        padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                        background: 'var(--bg-card)', color: 'var(--text-primary)',
+                        fontSize: 11, width: 130, cursor: 'pointer',
+                      }} />
+                    <span>—</span>
+                    <input type="date" value={rangeEnd} onChange={handleRangeEnd}
+                      style={{
+                        padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border)',
+                        background: 'var(--bg-card)', color: 'var(--text-primary)',
+                        fontSize: 11, width: 130, cursor: 'pointer',
+                      }} />
+                  </div>
                 </div>
               }
             />

@@ -28,7 +28,8 @@ export default function ExpensesPage() {
   const [formCategory, setFormCategory] = useState('Other');
   const [formDescription, setFormDescription] = useState('');
   const [formAmount, setFormAmount] = useState('');
-  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [formDate, setFormDate] = useState(todayStr);
   const [formVendor, setFormVendor] = useState('');
   const [formNotes, setFormNotes] = useState('');
 
@@ -82,7 +83,8 @@ export default function ExpensesPage() {
 
   async function handleSave() {
     if (!formPaymentId) { toast.warning('Please select a payment'); return; }
-    if (!formAmount || Number(formAmount) <= 0) { toast.warning('Amount is required'); return; }
+    if (!formAmount || Number(formAmount) <= 0) { toast.warning('Amount is required and must be positive'); return; }
+    if (formDate && formDate > todayStr) { toast.warning('Expense date cannot be in the future'); return; }
 
     const payment = payments.find(p => p.id === formPaymentId);
     if (!payment) { toast.warning('Payment not found'); return; }
@@ -245,7 +247,7 @@ export default function ExpensesPage() {
         <div className="form-row">
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Date</label>
-            <input className="form-input" type="date" value={formDate} onChange={e => setFormDate(e.target.value)} />
+            <input className="form-input" type="date" value={formDate} onChange={e => setFormDate(e.target.value)} max={todayStr} />
           </div>
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Vendor</label>

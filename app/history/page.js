@@ -54,8 +54,8 @@ export default function InvoiceHistoryPage() {
 
   async function handleDelete(id) {
     await deleteInvoice(id);
-    const payment = payments.find(p => p.invoiceNo === id);
-    if (payment) {
+    const linkedPayments = payments.filter(p => p.invoiceNo === id);
+    for (const payment of linkedPayments) {
       const linkedExpenses = expenses.filter(e => e.paymentId === payment.id);
       for (const exp of linkedExpenses) {
         await deleteExpense(exp.id);
@@ -431,7 +431,7 @@ export default function InvoiceHistoryPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => handleDelete(deleteTarget)}
         title="Delete Invoice"
-        message="This will permanently remove this invoice record."
+        message="This will permanently remove this invoice and all linked payments and expenses. This action cannot be undone."
       />
     </div>
   );
