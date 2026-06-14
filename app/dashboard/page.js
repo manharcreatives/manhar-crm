@@ -64,6 +64,12 @@ export default function DashboardPage() {
     .slice(0, 5)
     .map(c => ({ ...c, client: clients.find(cl => cl.id === c.clientId) }));
 
+  const upcomingMeetings = crm
+    .filter(c => c.meetingScheduled === 'Yes' && c.meetingDate && new Date(c.meetingDate) >= new Date())
+    .sort((a, b) => new Date(a.meetingDate) - new Date(b.meetingDate) || (a.meetingTime || '').localeCompare(b.meetingTime || ''))
+    .slice(0, 5)
+    .map(c => ({ ...c, client: clients.find(cl => cl.id === c.clientId) }));
+
   const todayStr = new Date().toISOString().split('T')[0];
   const [today, setToday] = useState('');
   const [rangePreset, setRangePreset] = useState('year');
@@ -426,6 +432,40 @@ export default function DashboardPage() {
             )}
           </Card>
         </div>
+
+        {/* Upcoming Meetings */}
+        <Card className="mb-6">
+          <CardHeader title="Upcoming Meetings" />
+          {upcomingMeetings.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {upcomingMeetings.map(c => (
+                <div key={c.clientId} style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 14px', background: 'rgba(255,255,255,0.02)',
+                  borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)'
+                }}>
+                  <div className="avatar" style={{ width: 34, height: 34, fontSize: 12 }}>
+                    {c.client?.name?.[0] || '?'}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>
+                      {c.client?.name || c.clientId}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
+                      <Clock size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      {formatDate(c.meetingDate)} {c.meetingTime ? `at ${c.meetingTime}` : ''}
+                    </div>
+                  </div>
+                  <span className={`badge badge-${(c.leadStatus || 'newlead').toLowerCase().replace(/\s+/g, '')}`}>
+                    {c.leadStatus || 'Lead'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ textAlign: 'center', color: '#6B7280', padding: 24, fontSize: 13 }}>No upcoming meetings</div>
+          )}
+        </Card>
 
         {/* Top Profitable Clients */}
         <Card className="mb-6">

@@ -34,7 +34,7 @@ export default function LoginPage() {
         <div className="login-card">
           <div className="login-header">
             <img
-              src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_auto/v1778926797/manhar_affwok.png"
+              src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_auto/v1780394532/512_512_Android_Primary_i5zofb.png"
               alt="Manhar Creatives"
               className="login-logo"
             />
