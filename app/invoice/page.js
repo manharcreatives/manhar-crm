@@ -72,6 +72,7 @@ export default function InvoicePage() {
         rate: Number(l.rate) || 0,
         amount: Number(l.amount) || 0,
       })),
+      notes: notes || '',
     };
     await addInvoice(newInvoice);
     setSavedInvoiceNo(invoiceNo);

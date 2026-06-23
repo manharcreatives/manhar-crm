@@ -280,16 +280,25 @@ export default function InvoiceHistoryPage() {
     </div>
   </div>
 
+  ${inv.notes ? `
   <div style="padding:0 15px 10px;display:grid;grid-template-columns:1fr 1.3fr;gap:12px">
     <div class="notes-box">
       <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px">Notes</div>
-      <div style="font-size:10px;color:#444;line-height:1.6">Thank you for choosing Manhar Creatives! We appreciate your trust and look forward to working with you.</div>
+      <div style="font-size:10px;color:#444;line-height:1.6">${inv.notes}</div>
     </div>
     <div>
       <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px">Terms &amp; Conditions</div>
       <div style="font-size:9px;color:#666;line-height:1.7">${termsHtml}</div>
     </div>
   </div>
+  ` : `
+  <div style="padding:0 15px 10px">
+    <div>
+      <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;margin-bottom:4px">Terms &amp; Conditions</div>
+      <div style="font-size:9px;color:#666;line-height:1.7">${termsHtml}</div>
+    </div>
+  </div>
+  `}
 
   <div style="padding:8px 15px 12px;display:flex;justify-content:center;border-top:1px solid #eee">
     <div style="text-align:center">
