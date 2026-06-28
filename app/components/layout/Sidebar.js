@@ -81,7 +81,7 @@ export default function Sidebar() {
       <aside className={sidebarClass}>
         <div className="sidebar-logo">
           <img
-            src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_auto/v1780394532/512_512_Android_Primary_i5zofb.png"
+            src="https://files.catbox.moe/fquzdh.png"
             alt="Manhar Creatives"
             className="sidebar-logo-img"
           />

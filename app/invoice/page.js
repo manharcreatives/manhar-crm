@@ -211,7 +211,7 @@ ${el.outerHTML}
                     <div style={{ marginBottom: 6 }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_auto/v1779002789/Manhar_Creatives_Logo_lgwias.png"
+                        src="https://files.catbox.moe/uuh5ur.png"
                         alt="Manhar Creatives"
                         style={{ height: 52, width: 'auto', objectFit: 'contain' }}
                       />
@@ -347,7 +347,7 @@ ${el.outerHTML}
               <div style={{ padding: '16px 40px 32px', display: 'flex', justifyContent: 'center', borderTop: '1px solid #f3f4f6' }}>
                 <div style={{ textAlign: 'center' }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="https://res.cloudinary.com/dm2hjn5wp/image/upload/q_auto/f_png/v1779208013/1000223413-removebg-preview_nthrxg.png" alt="Signature" style={{ height: 70, width: 'auto', objectFit: 'contain', marginBottom: 4 }} />
+                  <img src="https://files.catbox.moe/6y64bb.png" alt="Signature" style={{ height: 70, width: 'auto', objectFit: 'contain', marginBottom: 4 }} />
                   <div style={{ fontSize: 11, color: '#888' }}>Authorized Signature</div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: '#555', marginTop: 2 }}>Manhar Creatives</div>
                 </div>
