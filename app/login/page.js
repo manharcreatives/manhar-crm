@@ -11,7 +11,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [show, setShow] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     if (!password.trim()) {
@@ -19,7 +19,7 @@ export default function LoginPage() {
       return;
     }
     setLoading(true);
-    const ok = login(password);
+    const ok = await login(password);
     setLoading(false);
     if (!ok) {
       setError('Incorrect password');

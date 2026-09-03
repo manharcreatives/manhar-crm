@@ -1,22 +1,11 @@
 'use client';
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import supabase from './supabase';
 
 const StoreContext = createContext(null);
 
 function toSnake(str) {
   return str.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
-}
-
-function objToDb(obj) {
-  const result = {};
-  for (const key in obj) {
-    if (obj[key] !== undefined) {
-      result[toSnake(key)] = obj[key];
-    }
-  }
-  return result;
 }
 
 function rowToJs(row) {
@@ -28,18 +17,57 @@ function rowToJs(row) {
   return result;
 }
 
+async function apiGet(table) {
+  const res = await fetch(`/api/data/${table}`);
+  if (!res.ok) throw new Error(`Failed to fetch ${table}`);
+  const data = await res.json();
+  return (data || []).map(rowToJs);
+}
+
+async function apiPost(table, record) {
+  const res = await fetch(`/api/data/${table}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  });
+  if (!res.ok) throw new Error(`Failed to insert into ${table}`);
+  return await res.json();
+}
+
+async function apiPatch(table, payload) {
+  const res = await fetch(`/api/data/${table}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to update ${table}`);
+  return await res.json();
+}
+
+async function apiDelete(table, payload) {
+  const res = await fetch(`/api/data/${table}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(`Failed to delete from ${table}`);
+  return await res.json();
+}
+
 async function fetchAll(table, retries = 5) {
   for (let attempt = 0; attempt < retries; attempt++) {
-    const { data, error } = await supabase.from(table).select('*');
-    if (!error) return (data || []).map(rowToJs);
-    const msg = error?.message || '';
-    if (msg.includes('Could not find the table') && attempt < retries - 1) {
-      const delay = (attempt + 1) * 2000;
-      await new Promise(r => setTimeout(r, delay));
-      continue;
+    try {
+      return await apiGet(table);
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg.includes('Failed to fetch') && attempt < retries - 1) {
+        const delay = (attempt + 1) * 2000;
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      console.error(`Error loading ${table}:`, msg);
+      return [];
     }
-    console.error(`Error loading ${table}:`, msg);
-    return [];
   }
   return [];
 }
@@ -142,39 +170,6 @@ export function StoreProvider({ children }) {
         fetchAll('services'),
         fetchAll('expenses'),
       ]);
-      const hasLocal = typeof window !== 'undefined' && localStorage.getItem('mc_clients');
-      if (c.length === 0 && hasLocal) {
-        const localClients = JSON.parse(localStorage.getItem('mc_clients') || '[]');
-        const localCrm = JSON.parse(localStorage.getItem('mc_crm') || '[]');
-        const localPayments = JSON.parse(localStorage.getItem('mc_payments') || '[]');
-        const localInvoices = JSON.parse(localStorage.getItem('mc_invoices') || '[]');
-        const localServices = JSON.parse(localStorage.getItem('mc_services') || '[]');
-        const localExpenses = JSON.parse(localStorage.getItem('mc_expenses') || '[]');
-        if (localClients.length > 0) {
-          const { error: ce } = await supabase.from('clients').insert(localClients.map(objToDb));
-          if (!ce) c = localClients;
-        }
-        if (localCrm.length > 0) {
-          const { error: cme } = await supabase.from('crm').insert(localCrm.map(objToDb));
-          if (!cme) cr = localCrm;
-        }
-        if (localPayments.length > 0) {
-          const { error: pe } = await supabase.from('payments').insert(localPayments.map(objToDb));
-          if (!pe) p = localPayments;
-        }
-        if (localInvoices.length > 0) {
-          const { error: ie } = await supabase.from('invoices').insert(localInvoices.map(objToDb));
-          if (!ie) i = localInvoices;
-        }
-        if (localServices.length > 0) {
-          const { error: se } = await supabase.from('services').insert(localServices.map(objToDb));
-          if (!se) s = localServices;
-        }
-        if (localExpenses.length > 0) {
-          const { error: ee } = await supabase.from('expenses').insert(localExpenses.map(objToDb));
-          if (!ee) e = localExpenses;
-        }
-      }
       if (!cancelled) {
         setClientsState(c);
         setCrmState(cr);
@@ -190,122 +185,140 @@ export function StoreProvider({ children }) {
   }, []);
 
   function logErr(context, error) {
-    console.error(`${context}:`, error?.message || error?.details || error?.hint || JSON.stringify(error));
+    console.error(`${context}:`, error?.message || error);
   }
 
   const addClient = useCallback(async (client) => {
-    const { error } = await supabase.from('clients').insert([objToDb(client)]);
-    if (error) { logErr('addClient error', error); return; }
-    setClientsState(prev => [...prev, client]);
+    try {
+      await apiPost('clients', client);
+      setClientsState(prev => [...prev, client]);
+    } catch (error) { logErr('addClient error', error); }
   }, []);
 
   const updateClient = useCallback(async (id, data) => {
-    const { error } = await supabase.from('clients').update(objToDb(data)).eq('id', id);
-    if (error) { logErr('updateClient error', error); return; }
-    setClientsState(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    try {
+      await apiPatch('clients', { id, data });
+      setClientsState(prev => prev.map(c => c.id === id ? { ...c, ...data } : c));
+    } catch (error) { logErr('updateClient error', error); }
   }, []);
 
   const deleteClient = useCallback(async (id) => {
-    const { error } = await supabase.from('clients').delete().eq('id', id);
-    if (error) { logErr('deleteClient error', error); return; }
-    setClientsState(prev => prev.filter(c => c.id !== id));
+    try {
+      await apiDelete('clients', { id });
+      setClientsState(prev => prev.filter(c => c.id !== id));
+    } catch (error) { logErr('deleteClient error', error); }
   }, []);
 
   const deleteClients = useCallback(async (ids) => {
-    const { error } = await supabase.from('clients').delete().in('id', ids);
-    if (error) { logErr('deleteClients error', error); return; }
-    setClientsState(prev => prev.filter(c => !ids.includes(c.id)));
+    try {
+      await apiDelete('clients', { ids });
+      setClientsState(prev => prev.filter(c => !ids.includes(c.id)));
+    } catch (error) { logErr('deleteClients error', error); }
   }, []);
 
   const addCrmEntry = useCallback(async (entry) => {
-    const dbData = objToDb(entry);
-    const { error } = await supabase.from('crm').insert([dbData]);
-    if (error) { logErr('addCrmEntry error', error); return; }
-    setCrmState(prev => [...prev, entry]);
+    try {
+      await apiPost('crm', entry);
+      setCrmState(prev => [...prev, entry]);
+    } catch (error) { logErr('addCrmEntry error', error); }
   }, []);
 
   const updateCrmEntry = useCallback(async (clientId, data) => {
-    const { error } = await supabase.from('crm').update(objToDb(data)).eq('client_id', clientId);
-    if (error) { logErr('updateCrmEntry error', error); return; }
-    setCrmState(prev => prev.map(c => c.clientId === clientId ? { ...c, ...data } : c));
+    try {
+      await apiPatch('crm', { client_id: clientId, data });
+      setCrmState(prev => prev.map(c => c.clientId === clientId ? { ...c, ...data } : c));
+    } catch (error) { logErr('updateCrmEntry error', error); }
   }, []);
 
   const deleteCrmEntry = useCallback(async (clientId) => {
-    const { error } = await supabase.from('crm').delete().eq('client_id', clientId);
-    if (error) { logErr('deleteCrmEntry error', error); return; }
-    setCrmState(prev => prev.filter(c => c.clientId !== clientId));
+    try {
+      await apiDelete('crm', { client_id: clientId });
+      setCrmState(prev => prev.filter(c => c.clientId !== clientId));
+    } catch (error) { logErr('deleteCrmEntry error', error); }
   }, []);
 
   const addPayment = useCallback(async (payment) => {
-    const { error } = await supabase.from('payments').insert([objToDb(payment)]);
-    if (error) { logErr('addPayment error', error); return; }
-    setPaymentsState(prev => [...prev, payment]);
+    try {
+      await apiPost('payments', payment);
+      setPaymentsState(prev => [...prev, payment]);
+    } catch (error) { logErr('addPayment error', error); }
   }, []);
 
   const updatePayment = useCallback(async (id, data) => {
-    const { error } = await supabase.from('payments').update(objToDb(data)).eq('id', id);
-    if (error) { logErr('updatePayment error', error); return; }
-    setPaymentsState(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    try {
+      await apiPatch('payments', { id, data });
+      setPaymentsState(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
+    } catch (error) { logErr('updatePayment error', error); }
   }, []);
 
   const deletePayment = useCallback(async (id) => {
-    const { error } = await supabase.from('payments').delete().eq('id', id);
-    if (error) { logErr('deletePayment error', error); return; }
-    setPaymentsState(prev => prev.filter(p => p.id !== id));
+    try {
+      await apiDelete('payments', { id });
+      setPaymentsState(prev => prev.filter(p => p.id !== id));
+    } catch (error) { logErr('deletePayment error', error); }
   }, []);
 
   const addInvoice = useCallback(async (invoice) => {
-    const { error } = await supabase.from('invoices').insert([objToDb(invoice)]);
-    if (error) { logErr('addInvoice error', error); return; }
-    setInvoicesState(prev => [...prev, invoice]);
+    try {
+      await apiPost('invoices', invoice);
+      setInvoicesState(prev => [...prev, invoice]);
+    } catch (error) { logErr('addInvoice error', error); }
   }, []);
 
   const updateInvoice = useCallback(async (id, data) => {
-    const { error } = await supabase.from('invoices').update(objToDb(data)).eq('id', id);
-    if (error) { logErr('updateInvoice error', error); return; }
-    setInvoicesState(prev => prev.map(inv => inv.id === id ? { ...inv, ...data } : inv));
+    try {
+      await apiPatch('invoices', { id, data });
+      setInvoicesState(prev => prev.map(inv => inv.id === id ? { ...inv, ...data } : inv));
+    } catch (error) { logErr('updateInvoice error', error); }
   }, []);
 
   const deleteInvoice = useCallback(async (id) => {
-    const { error } = await supabase.from('invoices').delete().eq('id', id);
-    if (error) { logErr('deleteInvoice error', error); return; }
-    setInvoicesState(prev => prev.filter(i => i.id !== id));
+    try {
+      await apiDelete('invoices', { id });
+      setInvoicesState(prev => prev.filter(i => i.id !== id));
+    } catch (error) { logErr('deleteInvoice error', error); }
   }, []);
 
   const addService = useCallback(async (service) => {
-    const { error } = await supabase.from('services').insert([objToDb(service)]);
-    if (error) { logErr('addService error', error); return; }
-    setServicesState(prev => [...prev, service]);
+    try {
+      await apiPost('services', service);
+      setServicesState(prev => [...prev, service]);
+    } catch (error) { logErr('addService error', error); }
   }, []);
 
   const updateService = useCallback(async (id, data) => {
-    const { error } = await supabase.from('services').update(objToDb(data)).eq('id', id);
-    if (error) { logErr('updateService error', error); return; }
-    setServicesState(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    try {
+      await apiPatch('services', { id, data });
+      setServicesState(prev => prev.map(s => s.id === id ? { ...s, ...data } : s));
+    } catch (error) { logErr('updateService error', error); }
   }, []);
 
   const deleteService = useCallback(async (id) => {
-    const { error } = await supabase.from('services').delete().eq('id', id);
-    if (error) { logErr('deleteService error', error); return; }
-    setServicesState(prev => prev.filter(s => s.id !== id));
+    try {
+      await apiDelete('services', { id });
+      setServicesState(prev => prev.filter(s => s.id !== id));
+    } catch (error) { logErr('deleteService error', error); }
   }, []);
 
   const addExpense = useCallback(async (expense) => {
-    const { error } = await supabase.from('expenses').insert([objToDb(expense)]);
-    if (error) { logErr('addExpense error', error); return; }
-    setExpensesState(prev => [...prev, expense]);
+    try {
+      await apiPost('expenses', expense);
+      setExpensesState(prev => [...prev, expense]);
+    } catch (error) { logErr('addExpense error', error); }
   }, []);
 
   const updateExpense = useCallback(async (id, data) => {
-    const { error } = await supabase.from('expenses').update(objToDb(data)).eq('id', id);
-    if (error) { logErr('updateExpense error', error); return; }
-    setExpensesState(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+    try {
+      await apiPatch('expenses', { id, data });
+      setExpensesState(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+    } catch (error) { logErr('updateExpense error', error); }
   }, []);
 
   const deleteExpense = useCallback(async (id) => {
-    const { error } = await supabase.from('expenses').delete().eq('id', id);
-    if (error) { logErr('deleteExpense error', error); return; }
-    setExpensesState(prev => prev.filter(e => e.id !== id));
+    try {
+      await apiDelete('expenses', { id });
+      setExpensesState(prev => prev.filter(e => e.id !== id));
+    } catch (error) { logErr('deleteExpense error', error); }
   }, []);
 
   const stats = computeStats(clients, crm, payments, invoices, expenses);

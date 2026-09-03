@@ -5,24 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY = 'manhar_auth';
-const COOKIE_KEY = 'manhar_auth';
 const PUBLIC_ROUTES = ['/login'];
-
-function getCookie(name) {
-  if (typeof document === 'undefined') return null;
-  const match = document.cookie.match(new RegExp(`(^| )${name}=([^;]+)`));
-  return match ? decodeURIComponent(match[2]) : null;
-}
-
-function setCookie(name, value, days = 365) {
-  const expires = new Date(Date.now() + days * 864e5).toUTCString();
-  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
-}
-
-function removeCookie(name) {
-  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
-}
 
 export function AuthProvider({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
@@ -30,12 +13,15 @@ export function AuthProvider({ children }) {
   const pathname = usePathname();
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) || getCookie(COOKIE_KEY);
-    if (stored === 'true') {
-      setIsAuthenticated(true);
-    } else {
-      setIsAuthenticated(false);
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/auth/me');
+        setIsAuthenticated(res.ok);
+      } catch {
+        setIsAuthenticated(false);
+      }
     }
+    checkAuth();
   }, []);
 
   useEffect(() => {
@@ -50,20 +36,27 @@ export function AuthProvider({ children }) {
     }
   }, [isAuthenticated, pathname, router]);
 
-  const login = useCallback((password) => {
-    const correctPassword = process.env.NEXT_PUBLIC_AUTH_PASSWORD;
-    if (password === correctPassword) {
-      localStorage.setItem(STORAGE_KEY, 'true');
-      setCookie(COOKIE_KEY, 'true');
-      setIsAuthenticated(true);
-      return true;
+  const login = useCallback(async (password) => {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        setIsAuthenticated(true);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
     }
-    return false;
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY);
-    removeCookie(COOKIE_KEY);
+  const logout = useCallback(async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {}
     setIsAuthenticated(false);
     router.replace('/login');
   }, [router]);
