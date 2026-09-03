@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  /* Security headers + performance config */
   headers: async () => [
     {
       source: '/(.*)',
